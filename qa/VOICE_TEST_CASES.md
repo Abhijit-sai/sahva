@@ -23,3 +23,13 @@ For each clip, record: local fixture ID, consenting recorder ID (non-identifying
 - Enhanced: approved room-specific vocabulary, correction workflow and context-linked interpretation. Label manually corrected spans explicitly.
 - Compute WER/CER only with reference transcript; don't claim improvement simply because English text looks smoother.
 - Capture how summary status differs (`proposed` vs `agreed`) as a separate functional metric, not a fake transcription accuracy gain.
+
+## Identical-recording comparison
+
+From the repository root, run the following on a private fixture directory containing one consented english.wav and one consented telugu.wav. The command makes paid calls.
+
+```powershell
+node --env-file=.env.local scripts/compare-directions.ts .sahva/synthetic-inputs-WwRqjn --consented
+```
+
+Both paths use the same 16 kHz mono samples. The baseline sends a WAV to file ASR, translates the returned source and requests a complete synthesized WAV. The isolated trial sends both source tracks at the same time on independent ASR sockets. It displays no generated UI, commits at the known end of each recording and synthesizes only finalized text. The review folder contains each normalized original, baseline and streamed WAVs and side-by-side source and target text. Compare the SHA-256 of the normalized original before presenting results. Use a bilingual listener for names, quantities, negation, deadlines, tone and intelligibility. Report ties, regressions and manual corrections. The baseline timer begins with a complete file. The trial timer includes paced speech. Compare end-of-input delays separately from time to the first TTS payload. Acoustic playback, interruptions and room-report accuracy require the application rehearsal.
