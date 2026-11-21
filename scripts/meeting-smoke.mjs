@@ -5,7 +5,10 @@ import assert from "node:assert/strict";
 import { installSyntheticMicrophone } from "./qa-microphone.mjs";
 const fixtures = process.argv[2];
 if (!fixtures) throw Error("Pass the synthetic WAV fixture directory.");
-const trilingual = process.argv.includes("--trilingual");
+const liveMedia = process.argv.includes("--live-media");
+const transportOnly = process.argv.includes("--transport-only");
+const trilingual =
+  liveMedia || transportOnly || process.argv.includes("--trilingual");
 const captionsOnlyTe = process.argv.includes("--telugu-captions");
 const origin = process.env.SAHVA_SMOKE_ORIGIN || "http://localhost:3024";
 const browser = await chromium.launch({
@@ -16,10 +19,28 @@ const browser = await chromium.launch({
   ],
 });
 const pages = [];
+const mediaRequests = [];
+const outputRooms = new Map();
 const button = (page, name) => page.getByRole("button", { name, exact: true });
 async function enter(name, source, target, url) {
   const p = await browser.newPage();
   pages.push(p);
+  if (liveMedia || transportOnly) {
+    p.on("request", (r) => {
+      if (r.url().includes("/media/") && r.resourceType() === "fetch")
+        mediaRequests.push(r.url());
+    });
+    p.on("response", async (r) => {
+      if (!r.url().endsWith("/meeting") || !r.ok()) return;
+      const { outputToken, token } = await r.json();
+      const grant = (jwt) =>
+        JSON.parse(Buffer.from(jwt.split(".")[1], "base64url")).video;
+      assert.equal(grant(token).canSubscribe, false);
+      assert.equal(grant(outputToken).canPublish, false);
+      assert.equal(grant(outputToken).canSubscribe, true);
+      outputRooms.set(p, grant(outputToken).room);
+    });
+  }
   await installSyntheticMicrophone(
     p,
     join(
@@ -66,7 +87,176 @@ try {
       timeout: 90000,
     });
   }
-  if (trilingual) {
+  if (liveMedia || transportOnly) {
+    if (!["localhost", "127.0.0.1"].includes(new URL(origin).hostname))
+      throw Error("Live media rehearsal requires a local isolated app");
+    assert.equal(new Set(outputRooms.values()).size, 3);
+    const states = await Promise.all(pages.map(state));
+    assert.ok(states.every((s) => s.liveMedia === true));
+    const marks = (p) =>
+      p.evaluate(() =>
+        performance.getEntriesByName("sahva.receiver-decoded").map((m) => ({
+          ...m.detail,
+          decodedAt: performance.timeOrigin + m.startTime,
+        })),
+      );
+    if (transportOnly) {
+      const sdk = await import("@livekit/rtc-node");
+      const { openPcmTrack } = await import(
+        "../lib/server/interpretation-output.ts"
+      );
+      // Never use these local-only test credentials against a hosted SFU.
+      process.env.LIVEKIT_URL = "ws://127.0.0.1:17880";
+      process.env.LIVEKIT_API_KEY = "devkey";
+      process.env.LIVEKIT_API_SECRET = "secret";
+      const segment = crypto.randomUUID();
+      const track = await openPcmTrack(
+        sdk,
+        outputRooms.get(b),
+        "te-IN/" + states[0].me.id + "/" + segment,
+        24000,
+        AbortSignal.timeout(15000),
+      );
+      try {
+        for (let i = 0; i < 70; i++)
+          await track.write(
+            Int16Array.from({ length: 480 }, (_, n) =>
+              Math.round(5500 * Math.sin((2 * Math.PI * 500 * n) / 24000)),
+            ),
+          );
+        await track.drain();
+        await expect
+          .poll(() => marks(b))
+          .toContainEqual(
+            expect.objectContaining({ segment, target: "te-IN" }),
+          );
+        assert.equal((await marks(a)).length + (await marks(c)).length, 0);
+      } finally {
+        await track.close();
+      }
+      console.log(
+        "Loopback PCM decoded by the intended Chrome profile. Two other profiles received zero decoded segments.",
+      );
+    } else {
+      for (const p of pages)
+        await p.getByRole("checkbox", { name: /Using headphones/ }).check();
+      const sourceFilter = process.argv
+        .find((arg) => arg.startsWith("--source="))
+        ?.slice(9);
+      if (sourceFilter && !states.some((s) => s.me.speaking === sourceFilter))
+        throw Error("Unknown test source");
+      for (const [i, speaker] of pages.entries()) {
+        const member = states[i].me;
+        if (sourceFilter && member.speaking !== sourceFilter) continue;
+        console.log(
+          "Supplying one fictional",
+          member.speaking,
+          "microphone waveform",
+        );
+        await speaker.evaluate(async () => {
+          await window.qaSpeak();
+          await window.qaSourceEnded;
+        });
+        // Allow the final endpoint and its independent private archive to settle.
+        await expect
+          .poll(
+            async () =>
+              (await state(speaker)).turns.some(
+                (t) => t.speaker_id === member.id,
+              ),
+            { timeout: 45000 },
+          )
+          .toBe(true);
+        await expect
+          .poll(
+            async () =>
+              !(await state(speaker)).members.some((m) => m.recording),
+            { timeout: 45000 },
+          )
+          .toBe(true);
+        for (const [j, listener] of pages.entries()) {
+          if (i === j) continue;
+          await expect
+            .poll(
+              async () =>
+                (await marks(listener)).some((m) => m.speaker === member.id),
+              { timeout: 45000 },
+            )
+            .toBe(true);
+        }
+      }
+      const sourceTurns = (await state(a)).turns;
+      for (const [j, listener] of pages.entries()) {
+        const target = states[j].me.listening;
+        const incoming = sourceTurns.filter(
+          (t) => t.speaker_id !== states[j].me.id,
+        );
+        await expect
+          .poll(
+            async () => (await marks(listener)).map((m) => m.segment).sort(),
+            { timeout: 50000 },
+          )
+          .toEqual(incoming.map((t) => t.phrase_id).sort());
+        for (const mark of await marks(listener)) {
+          await expect
+            .poll(
+              async () =>
+                (await state(listener)).turns.find(
+                  (t) => t.phrase_id === mark.segment,
+                )?.stage,
+              { timeout: 60000 },
+            )
+            .toBe("ready");
+          const turn = (await state(listener)).turns.find(
+            (t) => t.phrase_id === mark.segment,
+          );
+          assert.equal(turn.target, target);
+          assert.equal(mark.target, target);
+          assert.equal(turn.speaker_id, mark.speaker);
+          assert.ok(
+            turn.voice &&
+              turn.translated_text &&
+              turn.live_timing.capture.lastVoiced,
+          );
+          assert.equal(mark.voice, turn.output_voice);
+          assert.ok(
+            Number(mark.endSample) > Number(mark.startSample) &&
+              mark.clockEpoch &&
+              mark.sourceTrackSid,
+          );
+          console.log(
+            JSON.stringify({
+              source: turn.source,
+              target,
+              segment: mark.segment,
+              actualVoice: mark.voice,
+              startSample: Number(mark.startSample),
+              endSample: Number(mark.endSample),
+              clockEpoch: mark.clockEpoch,
+              sourceEndToDecodedMs: Math.round(
+                mark.decodedAt - turn.live_timing.capture.lastVoiced,
+              ),
+              sourceStartToDecodedMs: Math.round(
+                mark.decodedAt - turn.live_timing.capture.onset,
+              ),
+            }),
+          );
+          const replay = await listener.request.get(
+            path + "/media/" + turn.id + "?kind=original",
+          );
+          assert.ok(replay.ok());
+          assert.equal((await replay.body()).toString("ascii", 0, 4), "RIFF");
+        }
+      }
+    }
+    assert.equal(mediaRequests.length, 0);
+    await button(c, "Withdraw consent").click();
+    for (const p of pages)
+      await expect(button(p, "Leave meeting audio")).toHaveCount(0);
+    console.log(
+      "No archive fetch for live playout. Consent withdrawal closed all three meeting controls.",
+    );
+  } else if (trilingual) {
     const langs = ["en-IN", "te-IN", "hi-IN"];
     const scripts = [/[a-z]/i, /[\u0c00-\u0c7f]/, /[\u0900-\u097f]/];
     const members = await Promise.all(
@@ -263,4 +453,5 @@ try {
   throw e;
 } finally {
   await browser.close();
+  if (transportOnly) await (await import("@livekit/rtc-node")).dispose();
 }

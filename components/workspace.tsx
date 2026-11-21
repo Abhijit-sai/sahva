@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useReducer, useState } from "react";
 import { LiveConversation, type Caption } from "./live-conversation";
+import { InterpretedMeeting } from "./interpreted-meeting";
 import { Entry } from "./entry";
 import { Report } from "./report";
 import { TurnCard, type TurnView } from "./turn-card";
@@ -30,6 +31,8 @@ type Snapshot = {
   captions: Caption[];
   meetingIssues: Record<string, string>;
   serverTime: number;
+  liveMedia?: boolean;
+  interpretationState?: "Translating" | "Catching up";
 };
 export function Workspace({ id }: { id: string }) {
   const [invite, setInvite] = useState(""),
@@ -38,6 +41,7 @@ export function Workspace({ id }: { id: string }) {
     [connection, setConnection] = useState(""),
     [error, setError] = useState("");
   const [now, setNow] = useState(0);
+  const [archiveAudio, setArchiveAudio] = useState(false);
   const [clock, setClock] = useState<ClockSample | null>(null);
   const [observations, setObservations] = useState<ListenerObservations>(
     () => ({
@@ -210,21 +214,53 @@ export function Workspace({ id }: { id: string }) {
           )}
           {state.canRecord && !connection ? (
             <>
-              <LiveConversation
-                key={state.room.media_epoch}
-                room={id}
-                meeting={meeting}
-                me={state.me}
-                peer={state.members.find((m) => m.id !== state.me.id)!}
-                caption={
-                  state.captions?.find((c) => c.speaker === state.me.id) ??
-                  state.caption
-                }
-                turns={state.turns}
-                refresh={refresh}
-                clock={clock}
-                onPlayback={observePlayback}
-              />
+              {meeting && state.liveMedia && !archiveAudio ? (
+                <InterpretedMeeting
+                  key={state.room.media_epoch}
+                  id={id}
+                  me={state.me}
+                  members={state.members}
+                  processing={state.interpretationState}
+                  onDecoded={(segment, at) => {
+                    if (clock)
+                      observePlayback(segment, {
+                        started: Math.round(at + clock.offset),
+                        uncertainty: clock.uncertainty + 40,
+                        decoded: true,
+                      });
+                  }}
+                />
+              ) : (
+                <LiveConversation
+                  key={state.room.media_epoch}
+                  room={id}
+                  meeting={meeting}
+                  me={state.me}
+                  peer={state.members.find((m) => m.id !== state.me.id)!}
+                  caption={
+                    state.captions?.find((c) => c.speaker === state.me.id) ??
+                    state.caption
+                  }
+                  turns={state.turns}
+                  refresh={refresh}
+                  clock={clock}
+                  onPlayback={observePlayback}
+                />
+              )}
+              {meeting && state.liveMedia && (
+                <details>
+                  <summary>Audio delivery</summary>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={archiveAudio}
+                      onChange={(e) => setArchiveAudio(e.target.checked)}
+                    />
+                    Use archived phrase playback
+                  </label>
+                  <p>Rejoin meeting audio after switching.</p>
+                </details>
+              )}
             </>
           ) : (
             <p>

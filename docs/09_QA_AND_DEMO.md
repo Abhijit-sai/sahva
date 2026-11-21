@@ -91,3 +91,57 @@ Use two accounts/browser profiles + headphones to prevent acoustical echo. Pre-t
 ## Self-hosted experiment
 
 Target 30 or more consented utterances per direction, including held-out voices and regional accents. Compare ASR on the same PCM, MT on confirmed source, TTS on verified target, and full pipelines on original-paced replay. Preserve recorded pauses. Record repetitions, failures, cold/warm p50 and p95, queue time, captions, commit, translated text, first decodable audio and browser playback start/end. Identify proxies and missing observations. Collect blinded meaning, names, quantities, polarity, omissions and naturalness scores separately. Live qualification includes two and three speakers, headphones, speakerphone, withdrawal and original replay.
+
+
+## Interpreted media acceptance matrix · proposed
+
+Use QA identifiers below independently of WBS ticket numbers. For every run record build, flags, source PCM digest, actual voice, browser/device, output route, source clock, network and test level. Separate synthetic browser decoding from physical sound. Measure last voiced input to first receiver output and offset uncertainty, and record per-direction p50/p95 plus sample counts. Repeat on separate networks, headphones and speakerphone, iOS Safari and Android Chrome. Require fluent review of commitments, dates, units and negations. For presenter, instrument ten markers at 1/3/10 minutes and record p50/p95/worst offset, rebuffers and peak memory.
+
+| ID | Condition | Expected behavior and proof |
+| --- | --- | --- |
+| QA-CALL-01 | A (Telugu) speaks; B listens English | Translated audio **automatically audible** without clicking a message; captions appear; record playout telemetry |
+| QA-CALL-02 | B responds English; A listens Telugu | Same in reverse; no late or wrong-language sample |
+| QA-CALL-03 | A speaks Telugu, B English, C Hindi | One source mic, two correct target-language outputs; correct attribution and permissions |
+| QA-CALL-04 | B chooses English matching source | Source/original audio eligible, no unnecessary synthetic voice; captions retained |
+| QA-CALL-05 | All three talk within same 2 seconds | Three distinct source tracks and transcript IDs; interpreted audio collision policy explicit; no silent loss |
+| QA-CALL-06 | Speaker interrupts a playing translation | Capture continues; user hears predictable interrupt/duck, backlog status; no deadlock |
+| QA-CALL-07 | Short pause mid-question or negation | No premature misleading spoken sentence; tentative captions may revise |
+| QA-CALL-08 | Very long clause | Progressive stable segments, bounded lag; explicit catch-up state |
+| QA-CALL-09 | Playback disallowed by browser | Join gesture unlock, persistent actionable enable-audio state; no false 'playing' |
+| QA-CALL-10 | Headphones removed / speakerphone used | Echo suppression avoids repeated translated turns; record acoustic result |
+| QA-CALL-11 | Mobile background, app switch, lock | Explicit resume state, no uncontrolled backlog or auto-replay |
+| QA-CALL-12 | Disconnect 1–10 seconds then reconnect | Monotonic epoch, no duplicate translation, missed captions/replay available |
+| QA-CALL-13 | Listener mutes incoming sound | Captions persist, no auto-play; unmute joins live boundary |
+| QA-CALL-14 | Source mutes microphone | Source processing stops and active turn completes/cancels correctly |
+| QA-CALL-15 | Any participant withdraws consent | Server cancels processing, unpublishes/halts audio, clears queue/buffers; old private media policy enforced |
+| QA-CALL-16 | Change language or voice mid-sentence | New config applied at safe segment boundary, old output drained with explicit status |
+| QA-CALL-17 | TTS times out after source transcription | Caption/original survives; translation unavailable label; retries idempotent |
+| QA-CALL-18 | Provider emits duplicate or reordered chunks | Deduplicate by epoch/segment/seq, reject wrong timestamps; playback ordered |
+| QA-CALL-19 | Two listeners request same language but different voices | Correct voice per listener/group; no cross-target mix |
+| QA-CALL-20 | End room during playout | Stop publishing, release tracks and workers, retain durable evidence; report based on committed source |
+| QA-CALL-21 | Playback very delayed | Explicit catch-up state and bounded queue; no silent truncation of commitments |
+| QA-CALL-22 | No incoming speech | Idle, no invented captions or audio; no unnecessary GPU cycle burn |
+| QA-CALL-23 | Numeric negation, dates and amounts | Human review catches critical inversions; stop promotion if critical-error gate fails |
+| QA-CALL-24 | Unauthorized listener attempts track/media access | Denied by server, not merely hidden UI |
+
+## 3. Presenter acceptance matrix
+| ID | Condition | Expected behavior and proof |
+| --- | --- | --- |
+| QA-PRES-01 | Presenter mic + camera start | Separate source tracks identified with one source timeline; viewer sees delayed video and translated speech |
+| QA-PRES-02 | Screenshare replaces camera | Track switch epoch, keyframe/discontinuity re-anchor, no phantom old video |
+| QA-PRES-03 | Slide change + spoken 'Next slide' | Captions and translated speech align reasonably with visible change; log source/event/playout offsets |
+| QA-PRES-04 | Hand gesture accompanying speech | Delayed video aligned with translated semantic segment, **not exact lip-sync claim** |
+| QA-PRES-05 | Translation takes 2s, then 8s | Dynamic bounded delay/rebuffer keeps semantic alignment; UI indicates lag; no growing unlimited queue |
+| QA-PRES-06 | Two listeners in Telugu and Hindi | Independent language playout schedules; one global video offset not falsely assumed correct |
+| QA-PRES-07 | Listener switches language mid-presentation | Flush old rendition, start new at matching PTS/keyframe; no overlapping languages |
+| QA-PRES-08 | Listener joins mid-broadcast | Wait for source-aligned audio + video buffer; does not jump to mismatched live head |
+| QA-PRES-09 | Presenter pauses then resumes | Silence recognized, clocks don't drift, segment IDs resume correctly |
+| QA-PRES-10 | Camera pauses or bandwidth degrades | Video rebuffer or degrade to correctly labeled audio+captions, not mismatched video |
+| QA-PRES-11 | Network packet loss/reconnect | Buffer bounds and anchors recover; no 30-second runaway delay |
+| QA-PRES-12 | Presenter shares system audio | Explicit inclusion/exclusion and mix policy; avoid duplicate STT from mic+screen audio |
+| QA-PRES-13 | Presenter disconnected/replaced | Role transfer, safe consent check, epoch reset, clear 'Waiting for presenter' |
+| QA-PRES-14 | Browser unsupported by chosen buffered player | Feature check and fallback; preserve captions/audio and display limitation |
+| QA-PRES-15 | Long talk (10/30 minutes) | Memory bounded, video/audio drift within reviewed tolerance, old segments evicted |
+| QA-PRES-16 | Recording/retention revoked | Stop egress/composition and purge ephemeral video/audio buffers appropriately |
+| QA-PRES-17 | Translation provider fails | Warning and original/captions-only fallback, not incorrect language with confident status |
+| QA-PRES-18 | Camera or screen track ends unexpectedly | End/switch state, avoid stale-frame freeze without notice |

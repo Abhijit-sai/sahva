@@ -66,3 +66,6 @@ Before starting a new chat, fill in `[ACTUAL_REPO_PATH]`, branch/HEAD, ticket, t
 
 
 For the self-hosted track, read ADR-0008, the research pack, the newest phase ledger entry and the AWS runbook. Check the actual running worker, room engine, fixture consent, checkpoint access and current quota before resuming. The uncommitted local listening lab is active project work.
+
+
+For interpreted-call work, reconcile the feature pack with ADR-0005 and proposed ADR-0009. Verify the running release, overlapping frontend files and GPU ownership. Use a separate checkout and the CALL/PRES gates. Append actual decoded and physical evidence separately.

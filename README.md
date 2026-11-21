@@ -90,3 +90,7 @@ With headphones, select **Using headphones · speak to interrupt playback** to s
 ## Experimental self-hosted translation
 
 Sahva’s public meetings use LiveKit and Sarvam. The local Translation Lab is the evaluation surface for the proposed private IndicTrans2 worker. Start with the [decision](docs/adr/0008_self_hosted_translation_eval.md), [phase plan](docs/08_WBS_AND_PHASE_PLAN.md) and [research pack](docs/Sahva_SelfHosted_Translation_Pack/README.md).
+
+## Interpreted group audio
+
+When live media interpretation is enabled, create a **Group meeting**, share its invitation and select **Join meeting audio** once on each device. Use **Enable meeting audio** if the browser suspends playback. Each listener receives committed remote speech on a private LiveKit audio track in their listening language. The conversation timeline retains captions and optional original/translated replay. **Audio delivery** offers the archived phrase fallback. Rehearsal timings show receiver-side decoded voice and clock uncertainty. [Test evidence](qa/S2ST_BENCHMARK.md)

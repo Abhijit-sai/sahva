@@ -9,12 +9,16 @@ export function MeetingMicrophone({
   suppress,
   enableSound,
   disableSound,
+  connectOutput,
+  incomingVoice,
 }: {
   id: string;
   voice: string;
   suppress: boolean;
   enableSound: () => Promise<void>;
   disableSound: () => void;
+  incomingVoice?: string;
+  connectOutput?: (url: string, token: string) => Promise<void>;
 }) {
   const rtc = useRef<Room | null>(null);
   const alive = useRef(true);
@@ -46,10 +50,15 @@ export function MeetingMicrophone({
     try {
       await enableSound();
       const { Room, RoomEvent } = await import("livekit-client");
-      const { url, token } = await api<{ url: string; token: string }>(
-        "/" + id + "/meeting",
-        { voice },
-      );
+      const { url, token, outputToken } = await api<{
+        url: string;
+        token: string;
+        outputToken?: string;
+      }>("/" + id + "/meeting", {
+        voice,
+        interpreted: !!connectOutput,
+        incomingVoice,
+      });
       if (!alive.current) return;
       const room = new Room({
         audioCaptureDefaults: {
@@ -80,6 +89,11 @@ export function MeetingMicrophone({
       room.localParticipant.setTrackSubscriptionPermissions(false, [
         { participantIdentity: "interpreter", allowAll: true },
       ]);
+      if (connectOutput) {
+        if (!outputToken) throw Error("Interpreted output unavailable");
+        await connectOutput(url, outputToken);
+        if (rtc.current !== room) return;
+      }
       await room.localParticipant.setMicrophoneEnabled(true);
       if (rtc.current === room) setStatus("on");
     } catch (e) {

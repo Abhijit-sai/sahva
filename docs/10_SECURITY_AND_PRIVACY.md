@@ -58,3 +58,8 @@ No external calendar, WhatsApp send or email action should be automatically exec
 ## Experimental GPU processor
 
 Obtain consent for the named processors, data, region and retention. Send the MT worker only the confirmed text it needs. Use a private network or loopback tunnel, authenticated server-side calls, bounded ephemeral buffers and sanitized errors. Mount pinned, reviewed model code and weights read-only. Record deletion and withdrawal across all copied artifacts. Voice cloning requires distinct explicit consent and is outside the initial experiment.
+
+
+## Proposed output grants and presentation retention
+
+Authenticate the room cookie and verify unanimous consent and media_epoch before issuing any output credential. Only the worker publishes in recipient-scoped output rooms. Isolate raw microphones and reject synthesized input. Revocation, expiry or room end cancels outstanding inference and clears queued audio. Keep receipts free of tokens and transcript text. Preserve existing private original/translation access and deletion rules. Presenter roles gate publication at the transport. Audience joins receive-only. Screen audio is excluded unless separately designated. Bound and expire temporary encoded media on end, revocation and discontinuity.

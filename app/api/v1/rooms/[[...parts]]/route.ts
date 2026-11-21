@@ -114,28 +114,26 @@ async function handle(req: NextRequest, context: Params) {
         [id, participant],
       );
       const snapshot = await timeline(id, participant);
+      const meeting = snapshot.room.transport === "livekit" ? await import("../../../../../lib/server/meeting") : undefined;
       const captions = snapshot.canRecord ? liveCaptions(id, snapshot.me.listening) : [];
       return json({
         ...snapshot,
+        liveMedia: !!meeting && meeting.interpretedRoom(id),
         captions,
-        meetingIssues:
-          snapshot.room.transport === "livekit"
-            ? (await import("../../../../../lib/server/meeting")).meetingIssues(
-                id,
-              )
-            : {},
+        meetingIssues: meeting?.meetingIssues(id) ?? {},
+        interpretationState: meeting?.interpretationState(id, participant),
         serverTime: serverTime(),
         caption: captions[0] ?? null,
       });
     }
     if (post && action === "meeting" && parts.length === 2) {
-      const { voice } = z
-        .object({ voice: z.string().max(64).optional() })
+      const { voice, interpreted, incomingVoice } = z
+        .object({ voice: z.string().max(64).optional(), interpreted: z.boolean().default(false), incomingVoice: z.string().max(64).optional() })
         .parse(await jsonInput(req));
       return json(
         await (
           await import("../../../../../lib/server/meeting")
-        ).joinMeeting(id, participant, voice),
+        ).joinMeeting(id, participant, voice, interpreted, incomingVoice),
       );
     }
     if (post && action === "turns" && parts.length === 2) {

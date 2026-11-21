@@ -281,3 +281,21 @@ One Hindi, one English and one Telugu Chrome profile joined the same meeting at 
 | Hindi → Telugu | 21.11 s |
 
 Each time is an upper bound for playback start and includes the source phrase and a follow-up timeline fetch. The later console times of 22.08–23.24 s also include fetching the translated WAV again for verification. Neither measures last source speech to first sound on device. All six texts retained the prohibition on sending 15 and the correction to 12. Both Hindi-source outputs used containers as the shipment unit. A three-turn call cannot establish general accuracy or human listening latency.
+
+
+## Interpreted media rehearsal · 21–22 November 2026
+
+Three isolated Windows Chrome profiles, one loopback LiveKit v1.13.11 SFU, independent synthetic microphones, real Sarvam, embedded private room storage. The tone-only control delivered decoded samples exclusively to its intended recipient. Archive replay remained accessible through the existing authorized route. For live playback the browser used the remote track and Web Audio output. The receiver observation is first non-silent decoded samples on a running, unmuted graph, sampled every 40 ms. The source endpoint is the bridge’s last voiced 100 ms frame. Physical speaker output, remote network jitter and human judgments remain separate tests.
+
+| Source → listener | Initial run, last voiced frame to first decoded output | Final Telugu retest |
+|---|---:|---:|
+| English → Hindi | 3641 ms | — |
+| English → Telugu | 3806 ms | — |
+| Telugu → Hindi | 2089 ms | 3431 ms |
+| Telugu → English | 1671 ms | 2998 ms |
+| Hindi → Telugu | 2963 ms | — |
+| Hindi → English | 2492 ms | — |
+
+The first run observed all six directions but failed its final completeness assertion. The recognizer split a waveform into multiple turns. A busy listener deferred speech to replay. The second run, with a three-slot listener queue, stopped on the Telugu input before Hindi because a remote ASR final was missing at the local silence boundary. After a bounded 1800 ms finalization wait, Telugu segment 1c4da20f-8e95-4e8a-98be-c94196f96962, source track clock 745ffc0e-cae4-4be8-b3f5-bc6846518507, source samples [12800,121600) at 16 kHz, reached both recipients once. The final run checked Simran and Shubh against the actual archived voice, original WAV access, zero live archive fetches and consent teardown. One final observation per route cannot establish a latency distribution. Keep archived processing as independent fallback. Live and archived inference can duplicate requests and diverge. Assess this before broader cost or quality claims.
+
+Fictional WAV SHA-256: English 2ecc4758884238e74bef53341b2f55654336e2d9e0041aa065c56640cf8e9e1d, Telugu b8edad280c5403de2d70bfdddb5f27c1276a9b9104ad7c80df69a7a7258270cc, Hindi 2010f36a8077d61e9fcb539745316c67a2c75b2e9043f5b34a679d60896c4017. Reproduce with scripts/meeting-smoke.mjs, the trilingual-room-fixtures directory and --transport-only or --live-media. --source=te-IN limits the live test to the Telugu source. Use a loopback app with SAHVA_LIVEKIT and SAHVA_LIVE_MEDIA_INTERPRETATION enabled. The tone control expects the local SFU on port 17880.

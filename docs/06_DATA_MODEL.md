@@ -92,3 +92,10 @@ Migration 005 adds rooms.transport and rooms.media_epoch. Existing rooms default
 ## Private lab evidence
 
 Use an ignored per-run directory for benchmark inputs, outputs, source PCM hashes, model and reference revisions, timing origin, failures and reviewer records. Associate speaker and consent with private fixtures. Keep the original source immutable and use a new reference revision after correction. Lab evidence requires no room schema migration.
+
+
+## Proposed ephemeral interpretation data
+
+Reuse rooms.media_epoch (005), phrase idempotency key, speaker ID, turn revisions and per-language deliveries (006). An in-memory committed segment binds roomId, mediaEpoch, sourceTrackSid, clockEpoch, speakerId, segmentId, sourceRevision and start/end sample indices at 16 kHz. The interval is half-open. Segment positions are comparable only within the same clock epoch. A delivery adds listener eligibility, targetLanguage, actual voice, frame sequence and processing state. Client observations identify the output track, listener session, scheduling/decoded stage, and clock uncertainty. Archive receipts and client playout observations have separate lifetimes. No schema migration is required for a transport trial.
+
+Presenter anchors additionally bind video PTS, keyframe/discontinuity, source audio interval and translated duration. Keep the encoded window private, bounded and ephemeral.

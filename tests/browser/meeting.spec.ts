@@ -75,3 +75,68 @@ test("group invitations bind consent, fill six seats atomically and revoke the m
     await Promise.all(contexts.map((c) => c.close()));
   }
 });
+
+test("interpreted output recovers a blocked pre-join speaker without opening a microphone", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  test.skip(
+    process.env.SAHVA_RTC_TEST !== "1",
+    "requires the interpreted-meeting flag",
+  );
+  const profile = {
+    transport: "livekit",
+    name: "Listener",
+    speakingLanguage: "en-IN",
+    listeningLanguage: "en-IN",
+    acceptedConsent: true,
+    consentVersion: meetingConsent,
+  };
+  const headers = { "x-sahva-request": "1" };
+  const path = baseURL + "/api/v1/rooms";
+  const owner = await page.request.post(path, { headers, data: profile });
+  expect(owner.ok()).toBeTruthy();
+  const { roomId, invite } = await owner.json();
+  const peer = await browser.newContext();
+  try {
+    expect(
+      (
+        await peer.request.post(path + "/" + roomId + "/join", {
+          headers,
+          data: { ...profile, invite, name: "Peer" },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    await page.addInitScript(() => {
+      const resume = AudioContext.prototype.resume;
+      let blocked = true;
+      AudioContext.prototype.resume = function () {
+        if (blocked) {
+          blocked = false;
+          return this.suspend().then(() => { throw new DOMException("Blocked", "NotAllowedError"); });
+        }
+        return resume.call(this);
+      };
+    });
+    await page.goto("/room/" + roomId);
+    await page.getByRole("button", { name: "Test speaker" }).click();
+    const recover = page.getByRole("button", { name: "Enable meeting audio" });
+    await expect(recover).toBeVisible();
+    await recover.click();
+    await expect(recover).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Join meeting audio" }),
+    ).toBeVisible();
+    await page.getByText("Audio delivery", { exact: true }).click();
+    await page.getByLabel("Use archived phrase playback").check();
+    await expect(
+      page.getByRole("button", { name: "Test speaker" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Join meeting audio" }),
+    ).toBeVisible();
+  } finally {
+    await peer.close();
+  }
+});

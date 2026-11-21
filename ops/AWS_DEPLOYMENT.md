@@ -212,3 +212,7 @@ aws ec2 wait instance-stopped --region "$GPU_REGION" --instance-ids "$GPU_INSTAN
 [EC2 stop/start lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html)
 
 For a three-language release rehearsal, confirm the active sahva-app image matches the intended release SHA and the public /api/ready endpoint succeeds. Run scripts/meeting-smoke.mjs with consented fictional English, Telugu and Hindi fixtures and --trilingual against the HTTPS origin. The normal rehearsal requires Tarun on both Telugu deliveries and browser playback on all six routes; the private Maya worker is optional. Preserve the actual voice name when comparing runs.
+
+### Interpreted group audio
+
+Set SAHVA_LIVE_MEDIA_INTERPRETATION=1 alongside SAHVA_LIVEKIT=1 in the existing runtime environment to use interpreted tracks in ordinary group meetings. An optional SAHVA_LIVE_MEDIA_ROOM_ID limits that behavior to one room. Leave it unset for ordinary invitations. The updater reads the environment file at container replacement. Verify the running SHA, both flag values and public readiness. Participants can select **Audio delivery → Use archived phrase playback** and rejoin. For service-wide fallback disable the media flag and run the normal health-checked update. The existing two-person phrase room uses its original transport. No new database migration accompanies this release.

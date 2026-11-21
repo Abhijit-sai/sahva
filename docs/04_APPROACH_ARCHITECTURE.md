@@ -150,3 +150,10 @@ flowchart LR
 ```
 
 Initially replay text outside meetings. A later test room scopes each job to speaker, phrase revision, target, voice and consent epoch. Reject stale output after cancellation, order delivery per listener, and archive committed turns for report evidence. Identical targets may share text. Drafts remain provisional. A benchmark records a failed engine explicitly. [ADR-0008](adr/0008_self_hosted_translation_eval.md)
+
+
+## Proposed call and delayed-presentation transport
+
+Preserve ADR-0005 source-room grants. Only the interpreter subscribes to human microphone tracks. For the first slice, issue a second, receive-only token scoped to the authenticated member’s output room and consent epoch. A server publisher is the only writer there. This isolates original microphones, target audio and ASR. Keep both connections in the current single-process bridge lifecycle. Commit final source text with speaker, track SID and sample interval. Send interpreted PCM in paced media frames while archive/revision processing proceeds independently. Share inference where source, revision, target, voice and consent match. Serialize per recipient, bound pending age and count, and surface deferred content for replay.
+
+After the call gate, compare per-language server-composed CMAF/HLS with shared delayed video and separately scheduled target audio in MSE/WebCodecs. Both require source audio and video PTS on one calibrated clock, keyframe-aware bounded buffers, and language-specific schedules. Freeze/rebuffer when interpretation arrives late. Re-anchor on track or language changes and join-mid-stream. Benchmark both on mobile before selection. [LiveKit media](https://docs.livekit.io/transport/media/publish/) · [RTP synchronization](https://www.rfc-editor.org/rfc/rfc8834)

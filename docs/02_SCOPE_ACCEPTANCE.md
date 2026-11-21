@@ -81,3 +81,10 @@ Continuous streaming voice, open mic, echo suppression/ducking, barge-in, LiveKi
 ## Experimental acceptance
 
 Qualify a direction with a real authenticated response and healthy configured worker. Compare identical inputs, retain failed runs, and review critical facts bilingually. A later test room must demonstrate consent withdrawal, original replay, attribution, report evidence, ordered playback and explicit return to Standard.
+
+
+## Proposed CALL and PRES gates
+
+CALL requires automatic two-way phone/laptop output, Hindi fanout, correct voice and speaker, optional replay, and a report with valid evidence. Repeat with overlapping speech, changing output routes, consent loss and reconnection. Collect receiver audio and speech-end latency per direction. Preserve the archived-phrase fallback behind a server-controlled rollout.
+
+PRES starts after core call verification. Measure semantic alignment for a numbered gesture or slide against translated audio on one recorded fixture, then repeat live in two languages. Record p50/p95/worst offset, max lag, buffer size and rebuffers. Phoneme alignment, SIP and additional seats are outside this phase.

@@ -157,3 +157,12 @@ The text-only engineering trial labels receipts `sourceKind=fictional-script`, r
 ### Three-language meeting delivery
 
 The LiveKit room snapshots the other members' listening languages when it saves a turn. Each delivery belongs to its source turn, correction revision and target language. Timeline and translated-media responses use the requesting member's listening preference. Group drafts are also listener-specific. Same-language recipients replay the original. A missing Sreekar service routes Telugu synthesis to Tarun. The delivery records the actual output voice so the UI and rehearsal can distinguish the two. The report language contract continues to offer English and Telugu.
+
+
+## Proposed interpreted media contract
+
+Extend authenticated POST /api/v1/rooms/:id/meeting with an optional output credential and server-selected listening language. The existing token grants mic publication only. Scope the second token to one recipient, room and media epoch with subscribe-only permissions. Bind permission to the room cookie. Ignore client-specified identities. No PCM goes through data packets or the timeline endpoint.
+
+For each final source segment, validate track owner, room, epoch, segmentId, monotonic frame order, source revision and source interval. Route to other eligible listeners only. Bind the committed target language and voice before synthesis. Reject duplicate and stale work. Published, subscribed, decoded, scheduled and device-heard are separate observations. On disconnect or withdrawal abort active requests, flush frames and remove publisher connections. Missed/deferred speech stays in the timeline for explicit replay.
+
+A future presenter rendition descriptor includes clock epoch, source anchor, translated duration, available video PTS range, discontinuity and ready/rebuffering state. Advance only when both media ranges cover the selected anchor.

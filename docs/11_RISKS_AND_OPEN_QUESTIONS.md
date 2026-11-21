@@ -52,3 +52,16 @@ The laptop speaker reported acceptable translation and difficulty associating vo
 ## Open GPU evaluation risks
 
 Engineering owns cold starts, model gate access, truncation, normalization, cross-region delay, worker failure, simultaneous voices and OOM. Measure at batch one before increasing load. The operator owns quota, storage/compute billing and shutdown verification. Bilingual reviewers own critical-slot adjudication. The release owner must resolve checkpoint and upstream rights before adoption.
+
+
+## Interpreted media trials
+
+| Risk | Evidence needed |
+|---|---|
+| Output suspension or echo on phones | Physical Join, background/resume and speakerphone capture |
+| A pause commits a negation too early | Paired human-reviewed clauses with dates, amounts and interruptions |
+| Source leakage or recursive STT | Inspect actual grants, separate rooms and observed worker inputs |
+| Two speakers build a stale queue | Bound age/depth, preserve labels and visibly defer to the timeline |
+| Live and archival inference diverge or duplicate costs | Compare revision/voice receipts and share eligible completed results before rollout |
+| Per-language video stretches at different rates | Recorded PTS markers, measured drift/rebuffer and bounded memory |
+| Extra output connections and encoder cost | Six-seat capacity and per-language cost measurements before promotion |

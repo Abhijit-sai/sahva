@@ -116,3 +116,10 @@ A tester can compare eligible translation stages against a common verified trans
 ### Released group demo scope
 
 The opt-in LiveKit group room supports English, Telugu and Hindi in all six cross-language directions. For the Hindi-enabled demo, the accepted Telugu voice is Tarun on the managed service. Sreekar remains the preferred future private voice candidate. Meeting reports are available in English and Telugu. This extends the group demo beyond the original two-language phrase-call scope.
+
+
+## Interpreted calls and presenter sessions · proposed
+
+Sahva — Conversations without barriers. After joining meeting audio once, each listener should automatically hear each remote speaker in their listening language. Preserve independent microphones, attributed revisable captions, optional original and translated replay, and evidence-linked meeting notes. Keep six seats. Prove Telugu ↔ English on separate devices and add a Hindi listener before release. The deployed group room automatically plays completed phrase files.
+
+Presentation is a separate proposed session type. The host assigns one presenter to publish a microphone and camera or screen. Receive-only audience members select their language and see the presentation at its corresponding interpreted position. Display buffering and delay. Require consent from every member.

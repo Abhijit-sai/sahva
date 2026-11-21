@@ -166,3 +166,26 @@ LIVE-02 passed the four-phrase local provider test. LIVE-03 hardware and hosted 
 Ticket descriptions and operator steps are in the [research pack](Sahva_SelfHosted_Translation_Pack/docs/07_WBS_PHASE_PLAN.md).
 
 STREAM-01 group demo extension passed the three-person public rehearsal for English, Telugu and Hindi at c806285. The next evaluation items are conversational delay from the end of speech, Hindi shipment-unit fidelity, and repeated Sreekar listening and latency tests on approved compute. See the current project ledger for the release and benchmark references.
+
+
+## Interpreted meetings · proposed sequence
+
+| Ticket | Depends on | Exit evidence |
+|---|---|---|
+| CALL-00 | STREAM-01 | Verify source/runtime, grants, parallel ownership and baseline |
+| CALL-01 | CALL-00 | Join unlock and persistent output recovery on desktop and phone |
+| CALL-02 | CALL-01 | One authorized translated media track decoded at the listener before archive completion |
+| CALL-03 | CALL-02 | Two independent Telugu ↔ English routes, no synthesized input to ASR |
+| CALL-04 | CALL-03 | Hindi fanout, voice eligibility and bounded overlap |
+| CALL-05 | CALL-04 | Original replay, attributed captions, revisions and report survive archive delays |
+| CALL-06 | CALL-05 | Consent, interruption, mute and reconnect negative cases |
+| CALL-07 | CALL-06 | Stable clause and TTS timing versus critical meaning errors |
+| CALL-08 | CALL-07 | Physical 2/3-person call, latency distribution, approved release |
+| PRES-00 | Verified call output | Recorded video/PCM, shared source timestamps and numbered markers |
+| PRES-01 | PRES-00 | Compare both rendering architectures and measure adaptive buffers |
+| PRES-02 | PRES-01 | Live stage roles, separate microphone, camera or screenshare |
+| PRES-03 | PRES-02 | Two language schedules and semantic offset distributions |
+| PRES-04 | PRES-03 | Recovery, language/source switch, retention and ten-minute drift |
+| PRES-05 | PRES-04 | Guarded pilot and explicit release decision |
+
+CALL-01 and CALL-02 have local Chrome and worker evidence. CALL-03/04 have partial directional and queue evidence. The final provider-backed retest covered one Telugu source and two recipients. Phone output, complete bidirectional and third-participant human conversation, retry/reconnect acoustics, and the presenter gate are open. [Measured results](../qa/S2ST_BENCHMARK.md)

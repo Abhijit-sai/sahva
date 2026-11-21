@@ -31,3 +31,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 
 Before GPU or model work, read ADR-0008, the research pack, the latest ledger entry and the deployment runbook. Inspect all pending changes and active experiments. Preserve consent, private media and report evidence. Record measured results and obtain a scoped budget before provisioning.
+
+
+For interpreted meetings read ADR-0005, proposed ADR-0009, the CALL/PRES sequence and latest ledger entry. Inspect the frontend and model-lab worktrees before editing shared contracts. Core call proof precedes presenter engineering. Record actual receiver evidence for each slice.

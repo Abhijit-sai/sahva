@@ -21,6 +21,7 @@ export async function installSyntheticMicrophone(page, wavePath) {
         const source = audio.createBufferSource();
         source.buffer = clip;
         source.connect(output);
+        window.qaSourceEnded = new Promise(resolve => { source.onended = resolve; });
         source.start(0, 0, seconds ?? clip.duration);
       };
     },

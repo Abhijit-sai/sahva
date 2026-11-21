@@ -1,3 +1,4 @@
+import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import WebSocket from "ws";
 import { z } from "zod";
@@ -256,6 +257,22 @@ export function appendFrame(room: string, person: string, input: unknown) {
   }
   return { text: s.text, done: s.final || s.failed || s.bytes >= 800000 };
 }
+// The RTC bridge reads only the current owned phrase, before archive upload starts.
+export async function committedMeetingPhrase(room: string, person: string, key: string, stop: AbortSignal) {
+  const s = owned(room, person, key);
+  if (!s.meeting || s.bytes < 6400) return;
+  if (!s.final && !s.failed && s.socket.readyState === WebSocket.OPEN) {
+    // Silence at the local microphone can precede the remote final transcript.
+    const signal = AbortSignal.any([stop, AbortSignal.timeout(1800)]);
+    try {
+      s.socket.send(JSON.stringify({ event: "end" }));
+      while (!s.final && !s.failed && !signal.aborted) await once(s.socket, "message", { signal });
+    } catch { /* Archive ASR can recover an interrupted stream. */ }
+  }
+  if (stop.aborted || streams.get(streamId(room, person)) !== s || !s.final) return;
+  return { text: s.text, language: s.language, original: Buffer.concat(s.chunks), samples: s.bytes / 2 };
+}
+
 function wave(samples: Buffer, rate = 16000) {
   const h = Buffer.alloc(44);
   h.write("RIFF");

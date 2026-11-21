@@ -48,12 +48,14 @@ export class SarvamSpeech {
     path: string,
     body: FormData | Record<string, string | number>,
     schema: z.ZodType<T>,
+    stop?: AbortSignal,
   ) {
     const headers = new Headers({ "api-subscription-key": this.#key });
     const multipart = body instanceof FormData;
     if (!multipart) headers.set("Content-Type", "application/json");
     const start = performance.now();
-    const signal = AbortSignal.timeout(20_000);
+    const deadline = AbortSignal.timeout(20_000);
+    const signal = stop ? AbortSignal.any([deadline, stop]) : deadline;
     try {
       const response = await this.#send("https://api.sarvam.ai/" + path, {
         method: "POST",
@@ -113,6 +115,7 @@ export class SarvamSpeech {
     source: Language,
     target: Language,
     model: "mayura:v1" | "sarvam-translate:v1" = "mayura:v1",
+    signal?: AbortSignal,
   ) {
     if (!text.trim() || Array.from(text).length > 1000)
       throw new SpeechError("translation", "TEXT_LENGTH");
@@ -126,6 +129,7 @@ export class SarvamSpeech {
         target_language_code: target,
       },
       translation,
+      signal,
     );
     if (data.source_language_code !== source)
       throw new SpeechError("translation", "LANGUAGE_MISMATCH");
@@ -134,6 +138,25 @@ export class SarvamSpeech {
       requestId: data.request_id,
       elapsedMs,
     };
+  }
+
+  async streamPcm(text: string, target: Language, speaker: string, signal: AbortSignal) {
+    if (!supportsVoice(target, speaker) || !text.trim() || Array.from(text).length > 3500)
+      throw new SpeechError("tts", "INVALID_INPUT");
+    const response = await this.#send("https://api.sarvam.ai/text-to-speech/stream", {
+      method: "POST", redirect: "error", cache: "no-store", signal,
+      headers: { "api-subscription-key": this.#key, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "bulbul:v4-flash", speaker, language_code: target, text,
+        ...(target === "te-IN" ? { pace: 1.2, pitch: -0.1 } : {}),
+        output_audio_codec: "linear16", speech_sample_rate: 24000,
+      }),
+    });
+    if (!response.ok || !response.body || response.headers.get("content-type")?.split(";")[0] !== "audio/pcm") {
+      await response.body?.cancel();
+      throw new SpeechError("tts", "INVALID_PCM_RESPONSE");
+    }
+    return response.body;
   }
 
   async synthesize(

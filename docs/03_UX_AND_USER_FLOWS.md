@@ -58,3 +58,10 @@ Desktop 60/40 or 50/50 split: **left = live room controls/presence**; **right = 
 ## Internal Translation Lab
 
 The loopback listening lab already offers language and whole-engine selection, upload, microphone, replay and human review. The experimental stage view should pair a source recording with its verified text, hide unavailable pipelines, identify the revision and separate inference time from listener playback. Guest join flows use language preferences.
+
+
+## Proposed interpreted meeting journey
+
+Pre-join offers an output test. Join meeting audio unlocks the selected device, with a persistent Enable meeting audio action if the browser suspends output. Show microphone and output states independently. Listening means output is armed. Speaker active comes from source activity. Translating follows committed source text. Translated audio playing requires client playout evidence. Use Catching up for overlapping or stale phrases and keep missed items in the speaker-labelled timeline. Muted, Reconnecting and Consent withdrawn have distinct recovery actions. Headphones support interruption. Speakerphone requires echo control.
+
+Presenter listeners join receive-only and see their language, the actual delay and a buffering indicator. A language switch or camera/screen discontinuity resumes from a shared source anchor. Original replay is an explicit choice.

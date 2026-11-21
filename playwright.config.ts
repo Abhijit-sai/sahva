@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+const localMedia = process.env.SAHVA_RTC_TEST === "1";
 export default defineConfig({
   testDir:
     process.env.SAHVA_LIVE_QA === "1" ? "./tests/live" : "./tests/browser",
@@ -25,9 +26,10 @@ export default defineConfig({
         ? {}
         : {
             SAHVA_LIVEKIT: "1",
-            LIVEKIT_URL: "ws://127.0.0.1:1",
-            LIVEKIT_API_KEY: "offline-test",
-            LIVEKIT_API_SECRET: "offline-test-only",
+            LIVEKIT_URL: localMedia ? "ws://127.0.0.1:17880" : "ws://127.0.0.1:1",
+            SAHVA_LIVE_MEDIA_INTERPRETATION: localMedia ? "1" : "0",
+            LIVEKIT_API_KEY: localMedia ? "devkey" : "offline-test",
+            LIVEKIT_API_SECRET: localMedia ? "secret" : "offline-test-only",
           }),
       NEXT_TELEMETRY_DISABLED: "1",
     },
