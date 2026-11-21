@@ -63,3 +63,6 @@ Resume Sahva. Read AGENTS.md and README.md, then docs/08_WBS_AND_PHASE_PLAN.md, 
 
 ## Handoff checklist for the sender
 Before starting a new chat, fill in `[ACTUAL_REPO_PATH]`, branch/HEAD, ticket, time remaining and environment. Attach/provide the entire `sahva_project_pack` (or actual repo containing docs). If the new session cannot read local files, provide a zip or work in an environment with file access. Never fabricate repo status in the prompt.
+
+
+For the self-hosted track, read ADR-0008, the research pack, the newest phase ledger entry and the AWS runbook. Check the actual running worker, room engine, fixture consent, checkpoint access and current quota before resuming. The uncommitted local listening lab is active project work.

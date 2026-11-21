@@ -118,3 +118,35 @@ The EC2 deployment, local persistence option and audio duration verification fol
 ## Live phrase mode
 
 The expanded local demo adds a short-lived Sarvam PCM WebSocket, draft captions and phrase-boundary delivery alongside the recorded-turn route. It uses the same single-process room server, recording lease, storage and canonical report. [Accepted live interpreter decision](adr/0004_live_interpreter.md)
+
+## Deployed meeting audio and proposed direct interpretation
+
+Group rooms on release `c7011ab` use LiveKit Cloud. The hidden server subscriber passes each microphone to `interpretTrack` in `lib/server/meeting.ts` with its authenticated participant identity. Each reader supplies 16 kHz mono PCM in 100 ms frames. On voice activity the bridge opens a speaker-scoped Sarvam stream with up to four buffered frames. Saaras supplies changing captions, Mayura produces drafts, and `finishLive` archives the source WAV. The turn processor translates finalized text and requests Bulbul audio. Each listener's timeline selects the appropriate delivery or original. Consent withdrawal stops the bridge and rotates the media epoch. [Group meeting decision](adr/0005_livekit_meetings.md)
+
+| Path | Earliest possible translated playback | Work the application owns |
+| --- | --- | --- |
+| Deployed Sarvam | After phrase finalization, translation, synthesis and delivery | Separate ASR, translation and voice calls, per-speaker voice selection, original and revision history |
+| Proposed Gemini | When the first intelligible translated PCM reaches a listener's playback queue | One directional stream per speaker and distinct target, ordered listener playback, interruption, archival alignment and session renewal |
+
+“Direct” describes the application interface. Google's internal representations are unspecified. The first comparison runs outside the room on identical source PCM. A later opt-in bridge could fork each authorized microphone reader into archive and translation paths. Progressive playback would need a listener-scoped channel because the existing worker can only subscribe and the timeline serves finalized files. Same-language listeners continue to use the original. [Experimental decision and adoption criteria](adr/0006_gemini_live_translate.md)
+
+## Multi-provider evaluation
+
+See [ADR-0007](adr/0007_translation_lab.md) for listener-scoped selection, media authorization, archive provenance and fallback. Source and spoken target coverage are separate predicates. Existing participant storage accepts English and Telugu. Additional languages start in the recording lab until the complete meeting contract supports their archives, delivery, voice selection and reports.
+
+
+## Experimental translation stage
+
+```mermaid
+flowchart LR
+  A[Speaker microphone track] --> B[Saaras ASR]
+  B --> C[Committed source and original recording]
+  C --> D{MT choice}
+  D --> E[Mayura]
+  D --> F[Private IndicTrans2 worker]
+  E --> G[Bulbul TTS]
+  F --> G
+  G --> H[Authorized listener playback queue]
+```
+
+Initially replay text outside meetings. A later test room scopes each job to speaker, phrase revision, target, voice and consent epoch. Reject stale output after cancellation, order delivery per listener, and archive committed turns for report evidence. Identical targets may share text. Drafts remain provisional. A benchmark records a failed engine explicitly. [ADR-0008](adr/0008_self_hosted_translation_eval.md)

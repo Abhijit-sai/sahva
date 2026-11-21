@@ -114,7 +114,7 @@ async function handle(req: NextRequest, context: Params) {
         [id, participant],
       );
       const snapshot = await timeline(id, participant);
-      const captions = snapshot.canRecord ? liveCaptions(id) : [];
+      const captions = snapshot.canRecord ? liveCaptions(id, snapshot.me.listening) : [];
       return json({
         ...snapshot,
         captions,

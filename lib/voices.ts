@@ -6,9 +6,11 @@ export const voices = {
     { id: "simran_en_customer", name: "Simran" },
     { id: "dev_en_conversational", name: "Dev" },
   ],
+  "hi-IN": [{ id: "shubh_enhi_ads", name: "Shubh" }],
   "te-IN": [
     { id: "pooja_te_conversation", name: "Pooja" },
     { id: "kavitha_te_conversation", name: "Kavitha" },
+    { id: "tarun_te_narration", name: "Tarun" },
   ],
 } as const;
 

@@ -24,3 +24,8 @@
 - Fresh agents read `agent/STARTUP_PROMPT_TEMPLATE.md` and newest project summary entry before changing code.
 - Logs belong in append-only `PROJECT_SUMMARY.md`; accepted decisions in ADRs; API contracts in `docs/07_API_AND_EVENT_CONTRACTS.md`; never make every phase summary a second PRD.
 - Keep generated code/demo claims separately from verified test evidence.
+
+
+## Experimental inference
+
+Pin checkpoint and runtime dependencies, test the worker contract independently of real-model quality, validate language direction and length on both sides, and preserve bounded deadlines and concurrency through cancellation. Link retries to their fixture and record each attempt. Keep human audio, full captions and tokens out of source control and logs.

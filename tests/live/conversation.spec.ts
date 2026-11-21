@@ -41,7 +41,8 @@ test("four consented voice notes through two sessions, both speech directions an
   ].entries()) {
     const speaker = index % 2 === 0 ? page : second;
     const recipient = index % 2 === 0 ? second : page;
-    const buffer = await readFile(join(".sahva", "clips", file + ".m4a.mp4"));
+    const clips = process.env.SAHVA_LIVE_QA_CLIPS || join(".sahva", "clips");
+    const buffer = await readFile(join(clips, file + ".m4a.mp4"));
     const multipart = {
       audio: { name: "turn.mp4", mimeType: "audio/mp4", buffer },
       idempotencyKey: crypto.randomUUID(),

@@ -1,0 +1,2 @@
+fixture_id,source_language,target_language,duration_ms,sha256,consent_reference,recording_device,condition,source_reference_id,target_reference_id,critical_slots,notes
+example-placeholder,te-IN,en-IN,,,,phone,quiet,,,"negation;quantity;name",REPLACE_WITH_REAL_CONSENTED_FIXTURE

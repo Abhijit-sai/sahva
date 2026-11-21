@@ -28,3 +28,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+
+Before GPU or model work, read ADR-0008, the research pack, the latest ledger entry and the deployment runbook. Inspect all pending changes and active experiments. Preserve consent, private media and report evidence. Record measured results and obtain a scoped budget before provisioning.

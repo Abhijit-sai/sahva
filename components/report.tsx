@@ -10,7 +10,7 @@ type View = {
   skipped: number;
   canRetry: boolean;
   fallback: boolean;
-  language: Language;
+  language: keyof typeof labels;
   items: Fact[];
 };
 const labels = {
@@ -56,7 +56,9 @@ export function Report({
   preferred: Language;
   onEvidence: (id: string) => void;
 }) {
-  const [language, setLanguage] = useState(preferred),
+  const [language, setLanguage] = useState<keyof typeof labels>(
+      preferred === "hi-IN" ? "en-IN" : preferred,
+    ),
     [view, setView] = useState<View | null>(null),
     [error, setError] = useState("");
   const [tick, refresh] = useReducer((n) => n + 1, 0);
@@ -83,7 +85,7 @@ export function Report({
       clearTimeout(timer);
     };
   }, [room, language, tick]);
-  const words = labels[view?.language ?? preferred];
+  const words = labels[view?.language ?? language];
   return (
     <div className="report">
       <h2>{words.title}</h2>
@@ -91,13 +93,15 @@ export function Report({
         Report language
         <select
           value={language}
-          onChange={(e) => setLanguage(e.target.value as Language)}
+          onChange={(e) => setLanguage(e.target.value as keyof typeof labels)}
         >
-          {Object.entries(languages).map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
+          {Object.entries(languages)
+            .filter(([code]) => code in labels)
+            .map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
         </select>
       </label>
       {(!view || ["pending", "generating"].includes(view.status)) && (

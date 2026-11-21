@@ -120,6 +120,7 @@ export function LiveConversation({
     (t) =>
       t.speaker_id !== me.id &&
       !heard.has(t.id) &&
+      !t.voice_error &&
       (!t.error || (meeting && t.source === me.listening)),
   );
   const incomingId =
@@ -152,7 +153,8 @@ export function LiveConversation({
       !listening ||
       archivePlaying ||
       mode !== "idle" ||
-      (me.recording || (!meeting && peer.recording)) ||
+      me.recording ||
+      (!meeting && peer.recording) ||
       playSource.current ||
       !player.current
     )

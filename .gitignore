@@ -17,3 +17,7 @@ next-env.d.ts
 *.mp4
 .next-e2e/
 *.pem
+docs/Test_recordings/
+docs/Recordings/
+__pycache__/
+*.pyc

@@ -2,7 +2,8 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 import { voices, supportsVoice } from "../voices.ts";
 
-const language = z.enum(["te-IN", "en-IN"]);
+import { roomLanguages } from "../shared.ts";
+const language = z.enum(roomLanguages);
 export type Language = z.infer<typeof language>;
 export type Stage = "stt" | "translation" | "tts";
 
@@ -107,14 +108,19 @@ export class SarvamSpeech {
     };
   }
 
-  async translate(text: string, source: Language, target: Language) {
+  async translate(
+    text: string,
+    source: Language,
+    target: Language,
+    model: "mayura:v1" | "sarvam-translate:v1" = "mayura:v1",
+  ) {
     if (!text.trim() || Array.from(text).length > 1000)
       throw new SpeechError("translation", "TEXT_LENGTH");
     const { data, elapsedMs } = await this.#post(
       "translation",
       "translate",
       {
-        model: "mayura:v1",
+        model,
         input: text,
         source_language_code: source,
         target_language_code: target,

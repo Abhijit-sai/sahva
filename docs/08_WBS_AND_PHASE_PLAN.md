@@ -18,6 +18,19 @@ STREAM-01 adds a feature-flagged LiveKit meeting beside the existing room. Admit
 | P3 STREAM-01 | Measured phrase baseline | Isolated trial with two independent directions, bounded ordered playback and stable text commitments. | Same clips on baseline and trial. Record overlap, revisions, latency, entity errors, intelligibility, cost and fallback. | Isolated two-direction comparison completed locally. Three-profile Cloud integration passed locally and on sahva.madsoul.in with c7011ab. Physical acceptance remains open. |
 | P4 DEMO-01 | Physical and public gates, any enabled experiment qualified | Two devices, fresh utterance, canonical report, identical-recording baseline comparison, tested backup. | Bilingual reviewer signs off on differences or ties and known limits. Decode backup and rehearse recovery. | Open. Existing private synthetic backup covers LIVE-02. |
 
+### Direct speech translation experiment
+
+| Ticket | Dependency | Acceptance evidence |
+| --- | --- | --- |
+| S2ST-01 Access | Phase 4 handoff | Verify exact model, credential route, setup acknowledgement, quotas or a sanitized failure. |
+| S2ST-02 Single speaker | S2ST-01 | In each direction, stream paced source PCM, capture both transcript streams and play translated PCM as it arrives. Keep original, timestamps and playback evidence. |
+| S2ST-03 Two channels | Both directions pass | Run two independent simultaneous sessions. Check overlap, queue ownership, interruption, disconnect and teardown. |
+| S2ST-04 Comparison | Single-speaker evidence, S2ST-03 for overlap | Match fixture hashes, compare actual Sarvam and Gemini timings per direction, annotate quality and cost, record missing observations. Blind bilingual review includes high-risk details and expression. |
+| S2ST-05 Room trial | Documented advantage under ADR-0006 | Explicit server-side opt-in on a test room, independently scoped playback, Sarvam fallback. Verify mute, rejoin, consent epoch, original replay, caption attribution, voice preference, localized reports and evidence on three clients, then physical devices. |
+| S2ST-06 Adoption decision | S2ST-05 | Record measured tradeoffs and explicit release decision. A failed gate retains the deployed engine. |
+
+**21 November result.** S2ST-01 verified authenticated streaming and two-session capacity on this project. S2ST-02 and the isolated concurrent playback path in S2ST-03 passed using synthetic audio. Physical acoustics and transparent reconnection remain open. S2ST-04 measured a latency gain and material meaning errors. S2ST-05 is on hold. Retain Sarvam for this release under S2ST-06. [Paired results and evidence](../qa/S2ST_BENCHMARK.md)
+
 Historical foundation tickets and original timing assumptions follow.
 
 **Method:** Matt Pocock-style vertical tracer bullets: each ticket should leave a feature demonstrable through UI/API/storage rather than deliver a standalone layer. This local file is the single ticket tracker until migrated to real issues. Update status **here**, but record factual completion evidence and handoff in `PROJECT_SUMMARY.md`.
@@ -123,3 +136,31 @@ Change status here from `TODO` to `IN_PROGRESS` / `DONE` / `BLOCKED` only with a
 After the original SB-00–08 foundation, LIVE-01 covers live source captions, draft translation and automatic phrase delivery. LIVE-02 covers hands-free conversation and interruptions. LIVE-03 covers physical-device acceptance and judge rehearsal. See [live delivery phases](14_LIVE_DEMO_PHASES.md).
 
 LIVE-02 passed the four-phrase local provider test. LIVE-03 hardware and hosted HTTPS checks are open. VOICE-01 follows with optional per-speaker voice previews, delivery preferences and fluent-listener evaluation of emotional expression and tone.
+
+## Direction-specific model evaluation
+
+| Phase | Dependency and acceptance |
+| --- | --- |
+| M0 | Inventory deployed routes, provider documentation and working tree. Record ADR-0007. |
+| M1 | Gate the lab server-side. Filter source and spoken target separately. Unsupported preferences are never silently changed. |
+| M2 | Verify OpenAI session setup, real audio, transcripts and graceful drain on Telugu → English and Hindi/English. |
+| M3 | Verify a region-bound Qwen workspace and voice consent; run Hindi/English. |
+| M4 | Reuse Sarvam and Gemini. Verify track ownership, listener routing, switching and consent cleanup. |
+| M5 | Add Azure or ElevenLabs after region or enterprise eligibility and spoken language coverage are known. |
+| M6 | Replay identical consented files, store model and timing evidence, collect independent human grades. |
+| M7 | Run unit, browser and group regressions. Require separate approval for a deployment. |
+
+
+## Self-hosted evaluation tickets
+
+| Order | Ticket | Proof required |
+| --- | --- | --- |
+| A | GPU-00 / LAB-01 | Reconcile live implementation, exact fixture replay, bidirectional Sarvam baseline and speaker-confirmed references |
+| B | GPU-01 / GPU-02 / LAB-02 | Approved time-boxed host, pinned MT workers, identical verified text and blinded critical-slot review |
+| C | LAB-04 | Extend existing loopback lab with eligible stage choices and paired receipts |
+| D | GPU-05 / LAB-03 | Independent Maya/Bulbul listening and concurrency trial after MT evidence |
+| E | GPU-07 / GPU-08 / GPU-12 | ASR only after error attribution, heavier MT only after rights review |
+| F | GPU-03 / GPU-04 / GPU-06 / GPU-09 | Qualified stage in a flagged room, ordered playback and evidence regressions |
+| G | GPU-10 / GPU-11 | Cost, capacity, privacy and explicit release decision |
+
+Ticket descriptions and operator steps are in the [research pack](Sahva_SelfHosted_Translation_Pack/docs/07_WBS_PHASE_PLAN.md).

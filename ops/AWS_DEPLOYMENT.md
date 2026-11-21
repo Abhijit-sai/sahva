@@ -179,3 +179,34 @@ The container includes the public Supabase production root in `supabase/prod-ca-
 For the Oregon workshop deployment, select the specific Supabase region **West US (Oregon), us-west-2** so room queries and original/translated media stay near EC2. Supabase region changes require another project. Keep the previous project available through acceptance. Verify the new project URL, service key, pooler username and host belong together. Apply migrations, verify private buckets and use synthetic test audio for a two-way acceptance run before directing new rooms there. Existing room data and recordings require a separate scoped migration if they must remain accessible on the new deployment. [Supabase region migration](https://supabase.com/kb/troubleshooting/change-project-region-eWJo5Z)
 
 Measure audio submission to playable translation for each direction from the chosen host. Record the three Sarvam stage times separately from database round trips and member playback. Use synthetic QA clips for server-side comparison. OpenAI runs on room end and can be timed independently.
+
+
+## Optional isolated MT worker
+
+On 21 November 2026 the workshop role showed 0 applied G/VT and P vCPUs for both On-Demand and Spot in Oregon and N. Virginia. Mumbai denied the quota lookup. Oregon has 256 Standard On-Demand vCPUs with six in use, a separate pool. DL/Inf/Trn allowances are for different accelerator runtimes. Check account, SKU, region, IAM, current price and quota again before allocation.
+
+One Oregon g6.xlarge is a 4-vCPU, 24 GB L4 candidate. The AWS Linux shared On-Demand catalog listed $0.8048/hour. g5.xlarge (24 GB A10G) listed $1.006/hour and g6e.xlarge (48 GB L40S) $1.861/hour. Region-specific AZ capacity remains unknown. Seek approval for a maximum duration and all-in budget including EBS, transfer and any networking charges. Use a private subnet and authenticated tunnel. Run one worker, check both directions, collect nvidia-smi utilization/memory alongside timing and billed wall time. Set a session stop deadline before boot. End each test session by stopping the instance and verifying the EC2 state and billed uptime. Retain encrypted EBS for the next approved session. Final teardown and volume deletion require a separate retention decision. Roll back by deselecting the worker in the lab. [Oregon G quota](https://us-west-2.console.aws.amazon.com/servicequotas/home/services/ec2/quotas/L-DB2E81BA) · [AWS regional price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-west-2/index.csv)
+
+For the translation-only pilot, the operator also identified g4dn.xlarge. AWS lists one NVIDIA T4 with 16 GiB GPU memory, 16 GiB host RAM and four vCPUs. The picker showed Linux at $0.526/hour. The Oregon catalog independently confirmed that compute rate (DY2XVQ4WPT7BKDCH.JRTCKXETXF.6YS6EN2CT7). This is a lower-cost first candidate for the two distilled MT checkpoints. Record warm latency, peak VRAM and concurrency on that device before deciding whether the larger L4 is worthwhile. Both sizes require four available On-Demand G/VT vCPUs. The picker does not establish account quota or available AZ capacity. [AWS hardware specifications](https://docs.aws.amazon.com/ec2/latest/instancetypes/ac.html)
+
+The workshop organization policy denied the Oregon G/VT increase. The operator approved one Oregon `c7i.2xlarge` CPU session, up to two hours, at the observed Linux rate of $0.357/hour. This approval covers the initial test. For that session the operator authorized a temporary public IPv4 address and SSH from one operator IPv4 /32. Bind the worker to loopback, verify the SSH host key using the EC2 boot log, and tunnel the benchmark connection. Use encrypted gp3, IMDSv2 and guest shutdown behavior **Stop**. Enable the guest poweroff timer before installing packages, verify the timer is active, stop immediately after the tests, and verify EC2 shows **stopped**. The retained EBS volume incurs storage charges while stopped. The one-time trial details and results belong in the project ledger.
+
+### Start and stop the experimental host
+
+Record the approved instance ID, region, SKU and session end time. Check the host carries the experiment tag and an encrypted EBS root volume. Keep the pinned HF cache on EBS, since EC2 discards instance-store data on stop. Confirm guest-initiated shutdown behavior is set to Stop. At launch, configure a deadline that stops this specific instance even if the operator disconnects. Re-arm it for every approved start. There is no automatic wake schedule.
+
+1. Verify the experiment host is stopped and the checkpoint cache and fixture references are ready. Start that ID only, wait for EC2 status checks, reopen the private tunnel, and check worker readiness in both directions.
+2. Run the bounded batch, save its receipts and copy the permitted evidence. Stop as soon as the batch ends or fails. Send StopInstances for the tagged GPU instance and wait for instance-stopped. Stopping the worker container alone leaves EC2 compute billing active.
+3. Record UTC start/stop, instance state and billable seconds. Retained EBS, snapshots and any allocated public IPv4 resources can still incur charges. A new start depends on capacity in the instance's Availability Zone. Start the same EBS-backed host for the next approved batch.
+
+Use the following commands with the reviewed experiment ID and region from the session record. The start step incurs charges.
+
+```bash
+aws ec2 start-instances --region "$GPU_REGION" --instance-ids "$GPU_INSTANCE_ID"
+aws ec2 wait instance-status-ok --region "$GPU_REGION" --instance-ids "$GPU_INSTANCE_ID"
+# Complete the private benchmark and export evidence.
+aws ec2 stop-instances --region "$GPU_REGION" --instance-ids "$GPU_INSTANCE_ID"
+aws ec2 wait instance-stopped --region "$GPU_REGION" --instance-ids "$GPU_INSTANCE_ID"
+```
+
+[EC2 stop/start lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html)

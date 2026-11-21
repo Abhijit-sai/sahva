@@ -107,3 +107,8 @@ Pass the two-device test with four new utterances, original/translated replay, a
 The next demonstration adds real-time source captions, revisable translated drafts and automatic translated speech after each detected phrase. Participants keep the private original, timeline, corrections and canonical outcomes. The following phase addresses hands-free conversation and interruption handling. See [live delivery phases](14_LIVE_DEMO_PHASES.md) and [ADR-0004](adr/0004_live_interpreter.md).
 
 In hands-free mode, each participant activates once and can mute at any time. A headphone listener can opt in to interrupt spoken playback with a reply. The next voice milestone adds optional speaker-selected voice and delivery preferences. Evaluate expressive synthesis with fluent speakers before using it in a demo.
+
+
+## Internal stage comparison
+
+A tester can compare eligible translation stages against a common verified transcript, replay the corresponding private clip, inspect critical meaning errors and record a separate listening assessment. Speaking and listening languages remain the guest-facing controls. [Experimental scope](adr/0008_self_hosted_translation_eval.md)

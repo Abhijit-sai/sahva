@@ -24,6 +24,8 @@ export type TurnView = {
   current_text: string | null;
   translated_text: string | null;
   voice: boolean;
+  voice_error?: string | null;
+  output_voice?: string | null;
   busy: boolean;
 };
 const stages = {
@@ -80,6 +82,21 @@ export function TurnCard({
             {turn.error ? "Needs attention · " : ""}
             {stages[turn.stage]}…
           </p>
+        )}
+      {!own && turn.voice_error === "SREEKAR_UNAVAILABLE" && (
+        <p role="status">
+          Sreekar audio is unavailable. The Telugu translation is below.
+        </p>
+      )}
+      {!own &&
+        turn.voice &&
+        turn.target === "te-IN" &&
+        (turn.output_voice === "tarun_te_narration" ||
+          turn.output_voice === "Sreekar") && (
+          <small>
+            Telugu voice ·{" "}
+            {turn.output_voice === "Sreekar" ? "Sreekar" : "Tarun"}
+          </small>
         )}
       <div className="voice-message">
         {(own || turn.voice || turn.source === turn.target) && (

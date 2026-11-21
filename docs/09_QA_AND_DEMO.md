@@ -86,3 +86,8 @@ Use two accounts/browser profiles + headphones to prevent acoustical echo. Pre-t
 - [ ] No secrets / PII in logs
 - [ ] 3-minute rehearsal with fresh audio
 - [ ] Real fallback recording and limitations disclosure
+
+
+## Self-hosted experiment
+
+Target 30 or more consented utterances per direction, including held-out voices and regional accents. Compare ASR on the same PCM, MT on confirmed source, TTS on verified target, and full pipelines on original-paced replay. Preserve recorded pauses. Record repetitions, failures, cold/warm p50 and p95, queue time, captions, commit, translated text, first decodable audio and browser playback start/end. Identify proxies and missing observations. Collect blinded meaning, names, quantities, polarity, omissions and naturalness scores separately. Live qualification includes two and three speakers, headphones, speakerphone, withdrawal and original replay.

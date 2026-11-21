@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { synthesizeSreekar } from "../lib/providers/maya.ts";
 import { SarvamSpeech, SpeechError } from "../lib/providers/sarvam.ts";
 
 const json = (data: unknown) => Response.json(data);
@@ -68,7 +69,7 @@ describe("Sarvam transport contracts (simulated responses)", () => {
 
   it.each([
     { transcript: " ", language_code: "te-IN" },
-    { transcript: "text", language_code: "hi-IN" },
+    { transcript: "text", language_code: "de-DE" },
   ])("rejects empty or unsupported ASR", async (data) => {
     await expect(
       new SarvamSpeech("test-only", async () =>
@@ -114,5 +115,63 @@ describe("Sarvam transport contracts (simulated responses)", () => {
       ),
     ).rejects.toMatchObject({ stage: "translation" });
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("three-language meeting speech", () => {
+  it("requests Translate v1 directly from Hindi to Telugu", async () => {
+    const send = vi.fn<typeof fetch>().mockResolvedValue(
+      json({
+        request_id: "mt1",
+        translated_text: "పన్నెండు",
+        source_language_code: "hi-IN",
+      }),
+    );
+    const response = await new SarvamSpeech("test-only", send).translate(
+      "बारह",
+      "hi-IN",
+      "te-IN",
+      "sarvam-translate:v1",
+    );
+    expect(response.text).toBe("పన్నెండు");
+    expect(JSON.parse(String(send.mock.calls[0][1]?.body))).toMatchObject({
+      model: "sarvam-translate:v1",
+      source_language_code: "hi-IN",
+      target_language_code: "te-IN",
+    });
+  });
+
+  it("uses the private native endpoint only when configured", async () => {
+    const send = vi.fn<typeof fetch>().mockResolvedValue(new Response(wav));
+    vi.stubGlobal("fetch", send);
+    try {
+      vi.stubEnv("MAYA_NATIVE_SPEECH_URL", "");
+      vi.stubEnv("MAYA_NATIVE_TOKEN", "");
+      await expect(synthesizeSreekar("నమస్కారం")).rejects.toMatchObject({
+        code: "SREEKAR_UNAVAILABLE",
+      });
+      expect(send).not.toHaveBeenCalled();
+      vi.stubEnv(
+        "MAYA_NATIVE_SPEECH_URL",
+        "https://worker.example/v1/audio/speech",
+      );
+      vi.stubEnv("MAYA_NATIVE_TOKEN", "test-only");
+      const r = await synthesizeSreekar("నమస్కారం");
+      expect(r.audio).toEqual(wav);
+      expect(r.speaker).toBe("Sreekar");
+      const request = send.mock.calls[0][1]!;
+      expect(new Headers(request.headers).get("authorization")).toBe(
+        "Bearer test-only",
+      );
+      expect(JSON.parse(String(request.body))).toEqual({
+        input: "నమస్కారం",
+        language: "te",
+        response_format: "wav",
+        voice: "Sreekar",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
   });
 });

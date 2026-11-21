@@ -1,0 +1,10 @@
+torch==2.6.0
+transformers==4.51.3
+IndicTransToolkit==1.1.1
+sentencepiece==0.2.1
+sacremoses==0.1.1
+starlette==0.52.1
+uvicorn==0.38.0
+# Imported by IndicTrans custom modeling code for normalization and array operations.
+numpy==1.26.4
+scipy==1.15.3

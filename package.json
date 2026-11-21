@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:browser": "playwright test",
+    "lab:translate": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/s2st/demo.ts",
     "smoke:speech": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/speech-smoke.ts"
   },
   "dependencies": {

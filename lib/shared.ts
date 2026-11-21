@@ -1,5 +1,10 @@
-export type Language = "en-IN" | "te-IN";
-export const languages = { "en-IN": "English", "te-IN": "తెలుగు · Telugu" };
+export const roomLanguages = ["en-IN", "te-IN", "hi-IN"] as const;
+export type Language = (typeof roomLanguages)[number];
+export const languages = {
+  "en-IN": "English",
+  "te-IN": "తెలుగు · Telugu",
+  "hi-IN": "हिन्दी · Hindi",
+};
 export const consentVersion = "2026-11-21-v1";
 export const disclosure =
   "Sahva stores voice turns and sends audio and text to AI providers for transcription, translation, synthetic speech and meeting summaries. Both participants can replay recordings and read transcripts. AI can make mistakes. Room access lasts 24 hours. Deletion is handled by the demo operator.";

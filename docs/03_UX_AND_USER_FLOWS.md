@@ -53,3 +53,8 @@ Desktop 60/40 or 50/50 split: **left = live room controls/presence**; **right = 
 - Translation unavailable: keep original audio/transcript; mark recipient language translation unavailable, never substitute a fabricated clip.
 - Source text corrected: display current approved revision, with 'Show original ASR' history entry.
 - Provider sends wrong language code: validate and retry manually; do not silently produce speech in the wrong language.
+
+
+## Internal Translation Lab
+
+The loopback listening lab already offers language and whole-engine selection, upload, microphone, replay and human review. The experimental stage view should pair a source recording with its verified text, hide unavailable pipelines, identify the revision and separate inference time from listener playback. Guest join flows use language preferences.

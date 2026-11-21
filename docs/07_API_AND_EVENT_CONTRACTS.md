@@ -140,3 +140,20 @@ The live start route acquires the room lease and uses the authorized state retur
 ### Group meeting transport
 
 Create with transport=livekit and the group disclosure version. POST /api/v1/rooms/{room}/meeting requires a signed member session, an active meeting and consent from all members. It returns a short-lived room- and identity-scoped LiveKit microphone credential and accepts an optional validated translated voice. The timeline includes a captions array for concurrent speakers, a phrase_id on archived turns and per-viewer target/text/audio selection. The original two-person response retains caption for existing clients.
+
+## Loopback provider-evaluation protocol
+
+The opt-in lab process serves a public-metadata-only catalog, allowlisted synthetic WAVs, and one origin-checked WebSocket session at a time on loopback. The session path carries the engine, declared source and spoken target. Unknown or unsupported combinations and missing configuration are rejected before opening a provider. After ready, the browser sends bounded mono 16 kHz PCM16 in order, then finish. The server sends separate caption, audio, interruption, error and completion events. A Sarvam source snapshot and an append-only provider delta have distinct update semantics. The comparison export contains source hash, model, settings, local timing observations and optional human review. Lab evidence has its own lifecycle outside the canonical meeting record.
+
+
+## Experimental worker boundary
+
+Server-only bearer-authenticated GET /live, GET /ready, GET /v1/capabilities and POST /v1/mt/translate. Supply requestId, sourceLanguage, targetLanguage and finalized text. Return requestId, translatedText, exact model and revision, and inferenceMs. Bound text at 1,000 Unicode code points. Reject unsupported pairs, overload, malformed inputs and expired jobs with a structured error code. Capabilities describe loaded models. A later streaming test must distinguish draft and committed source, first MT, first decodable audio, playback start and playback completion. Room events require epoch and revision checks before delivery.
+
+The offline MT runner requires the worker to echo the request UUID and language pair and match the revision advertised in the authenticated capability response. New lab browser receipts include first source caption, first final source caption and the SHA-256 of the downloadable translated WAV. The existing source hash identifies decoded input PCM. Receipts from earlier runs may omit these fields.
+
+The text-only engineering trial labels receipts `sourceKind=fictional-script`, records the exact input-text digest and uses a null PCM digest. Speaker-confirmed recordings require a PCM digest, verified references and processor consent. On CPU the worker returns `runtime.device=cpu`, `runtime.dtype=float32`, a null CUDA runtime and zero allocated GPU bytes.
+
+### Three-language meeting candidate
+
+The LiveKit room snapshots the other members' listening languages when it saves a turn. Each delivery belongs to its source turn, correction revision and target language. Timeline and translated-media responses use the requesting member's listening preference. Group drafts are also listener-specific. Same-language recipients replay the original. A missing Sreekar service routes Telugu synthesis to Tarun. The delivery records the actual output voice so the UI and rehearsal can distinguish the two. The report language contract continues to offer English and Telugu.

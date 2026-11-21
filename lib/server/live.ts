@@ -18,7 +18,9 @@ type Session = {
   language: Language;
   socket: WebSocket;
   target: Language;
-  translated: string;
+  targets: Language[];
+  meeting: boolean;
+  drafts: Partial<Record<Language, string>>;
   lastAttempt: number;
   lastText: string;
   translating: boolean;
@@ -28,12 +30,12 @@ type Session = {
   final: boolean;
   failed: boolean;
   timer: ReturnType<typeof setTimeout>;
-  saving?: Promise<unknown>;
+  saving?: Promise<Awaited<ReturnType<typeof upload>>>;
 };
 const holder = globalThis as typeof globalThis & {
   sahvaStreams?: Map<string, Session>;
 };
-const streams = (holder.sahvaStreams ??= new Map());
+const streams = (holder.sahvaStreams ??= new Map<string, Session>());
 const frame = z.object({
   key: z.uuid(),
   seq: z.int().min(0).max(260),
@@ -53,7 +55,7 @@ function dispose(s: Session) {
 export function cancelRoomStream(room: string) {
   for (const s of streams.values()) if (s.room === room) dispose(s);
 }
-export function liveCaptions(room: string) {
+export function liveCaptions(room: string, listening?: Language) {
   return Array.from(streams.values())
     .filter((s) => s.room === room)
     .map((s) => ({
@@ -61,8 +63,8 @@ export function liveCaptions(room: string) {
       speaker: s.person,
       interimAt: s.timing.interim,
       text: s.text,
-      translated: s.translated,
-      target: s.target,
+      translated: s.drafts[listening ?? s.target] ?? "",
+      target: listening ?? s.target,
       final: s.final,
     }));
 }
@@ -126,7 +128,13 @@ export async function beginLive(
         ? otherLanguage(state.me.speaking)
         : state.members.find((m) => m.id !== person)!.listening,
     timing: {},
-    translated: "",
+    targets: [
+      ...new Set(
+        state.members.filter((m) => m.id !== person).map((m) => m.listening),
+      ),
+    ],
+    meeting: transport === "livekit",
+    drafts: {},
     lastAttempt: 0,
     lastText: "",
     translating: false,
@@ -197,20 +205,27 @@ export async function interpretDraft(
     s.saving
   )
     return;
-  if (s.language === s.target) {
-    s.translated = text;
-    return;
-  }
   s.translating = true;
   s.lastAttempt = Date.now();
   s.lastText = text;
   try {
-    const result = await new SarvamSpeech(
-      process.env.SARVAM_API_KEY!,
-    ).translate(text, s.language, s.target);
-    if (streams.get(streamId(room, person)) === s) s.translated = result.text;
-  } catch {
-    /* The durable turn retries translation independently after the phrase. */
+    const speech = new SarvamSpeech(process.env.SARVAM_API_KEY!);
+    await Promise.allSettled(
+      s.targets.map(async (target) => {
+        const draft =
+          target === s.language
+            ? text
+            : (
+                await speech.translate(
+                  text,
+                  s.language,
+                  target,
+                  s.meeting ? "sarvam-translate:v1" : "mayura:v1",
+                )
+              ).text;
+        if (streams.get(streamId(room, person)) === s) s.drafts[target] = draft;
+      }),
+    );
   } finally {
     s.translating = false;
   }

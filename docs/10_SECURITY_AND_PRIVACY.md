@@ -53,3 +53,8 @@ No external calendar, WhatsApp send or email action should be automatically exec
 - [ ] Prompt-injection transcript does not alter tool/system behavior
 - [ ] Deletion procedure tested or openly labeled manual/unimplemented
 - [ ] Room owner cannot claim someone else's agreement without evidence
+
+
+## Experimental GPU processor
+
+Obtain consent for the named processors, data, region and retention. Send the MT worker only the confirmed text it needs. Use a private network or loopback tunnel, authenticated server-side calls, bounded ephemeral buffers and sanitized errors. Mount pinned, reviewed model code and weights read-only. Record deletion and withdrawal across all copied artifacts. Voice cloning requires distinct explicit consent and is outside the initial experiment.

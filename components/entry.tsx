@@ -9,6 +9,8 @@ import {
   meetingConsent,
   meetingDisclosure,
   languages,
+  roomLanguages,
+  type Language,
 } from "../lib/shared";
 const hydrationSubscription = () => () => {};
 export function Entry({
@@ -30,13 +32,18 @@ export function Entry({
   const [group, setGroup] = useState(meeting);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [preferences, setPreferences] = useState<
-    Record<"en-IN" | "te-IN", string>
-  >({ "en-IN": voices["en-IN"][0].id, "te-IN": voices["te-IN"][0].id });
+  const [preferences, setPreferences] = useState<Record<Language, string>>({
+    "hi-IN": voices["hi-IN"][0].id,
+    "en-IN": voices["en-IN"][0].id,
+    "te-IN": voices["te-IN"][0].id,
+  });
   return (
     <main className="entry">
       <div className="intro">
-        <p className="eyebrow">Telugu ↔ English · Voice room</p>
+        <p className="eyebrow">
+          {group ? "English · తెలుగు · हिन्दी" : "Telugu ↔ English"} · Voice
+          room
+        </p>
         <h1>
           {id
             ? "Join the conversation."
@@ -68,7 +75,7 @@ export function Entry({
               transport: group ? "livekit" : "phrase",
               consentVersion: group ? meetingConsent : consentVersion,
             });
-            for (const target of ["en-IN", "te-IN"] as const)
+            for (const target of roomLanguages)
               rememberVoice(
                 room.roomId,
                 room.participantId,
@@ -126,11 +133,13 @@ export function Entry({
               <label key={name}>
                 {i ? "Listen in" : "Speak in"}
                 <select name={name}>
-                  {Object.entries(languages).map(([code, label]) => (
-                    <option value={code} key={code}>
-                      {label}
-                    </option>
-                  ))}
+                  {Object.entries(languages)
+                    .filter(([code]) => group || code !== "hi-IN")
+                    .map(([code, label]) => (
+                      <option value={code} key={code}>
+                        {label}
+                      </option>
+                    ))}
                 </select>
               </label>
             ),
@@ -138,17 +147,25 @@ export function Entry({
         </div>
         <details>
           <summary>Choose my translated voice</summary>
-          {(["en-IN", "te-IN"] as const).map((target) => (
-            <VoicePicker
-              key={target}
-              target={target}
-              value={preferences[target]}
-              onChange={(value) =>
-                setPreferences((prev) => ({ ...prev, [target]: value }))
-              }
-            />
-          ))}
+          {roomLanguages
+            .filter((target) => group || target !== "hi-IN")
+            .map((target) => (
+              <VoicePicker
+                key={target}
+                target={target}
+                value={preferences[target]}
+                onChange={(value) =>
+                  setPreferences((prev) => ({ ...prev, [target]: value }))
+                }
+              />
+            ))}
         </details>
+        {group && (
+          <p>
+            Meetings with Hindi use Sreekar for Telugu speech. When Sreekar is
+            unavailable, Tarun reads the Telugu translation.
+          </p>
+        )}
         <p className="notice">{group ? meetingDisclosure : disclosure}</p>
         <label className="check">
           <input type="checkbox" name="consent" required />I consent to

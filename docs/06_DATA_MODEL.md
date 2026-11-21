@@ -87,3 +87,8 @@ Use server-only Supabase service role and authorize all queries by participant-r
 ### LiveKit group meetings
 
 Migration 005 adds rooms.transport and rooms.media_epoch. Existing rooms default to phrase. Group seats range from 1 to 6. Room creation and invitation joins serialize seat assignment under the room lock. Consent withdrawal increments the media epoch. A stable phrase key links a live caption and its durable turn. English and Telugu deliveries share one source turn and its canonical evidence.
+
+
+## Private lab evidence
+
+Use an ignored per-run directory for benchmark inputs, outputs, source PCM hashes, model and reference revisions, timing origin, failures and reviewer records. Associate speaker and consent with private fixtures. Keep the original source immutable and use a new reference revision after correction. Lab evidence requires no room schema migration.

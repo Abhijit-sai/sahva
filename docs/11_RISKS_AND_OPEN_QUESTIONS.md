@@ -44,3 +44,11 @@ The laptop speaker reported acceptable translation and difficulty associating vo
 - Document chosen option, alternatives, consequences, owner, date and acceptance status in an ADR.
 - A pending question is **not** a blocker unless it affects the next ticket. Don't ask all questions again in each chat.
 - If a decision modifies user-facing capability, update PRD and acceptance criteria after ADR approval.
+
+- Dedicated spoken target coverage, region entitlement and preview models change over time. Recheck the registry against provider docs and a real audio response before a demo. Keep alias and test date with each result.
+- A model can omit a negative clause or move a figure between months even when exact audio arrives. Use complete source recordings, independent fluent reviewers and direction-specific results before adoption.
+
+
+## Open GPU evaluation risks
+
+Engineering owns cold starts, model gate access, truncation, normalization, cross-region delay, worker failure, simultaneous voices and OOM. Measure at batch one before increasing load. The operator owns quota, storage/compute billing and shutdown verification. Bilingual reviewers own critical-slot adjudication. The release owner must resolve checkpoint and upstream rights before adoption.

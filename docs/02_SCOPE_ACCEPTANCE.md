@@ -76,3 +76,8 @@ Continuous streaming voice, open mic, echo suppression/ducking, barge-in, LiveKi
 - Silence, incoming playback on the default setting and timeline replay do not initiate a new turn. Headphone users can opt in to interrupt incoming voice by speaking. The playback button also supports explicit interruption.
 - Mute releases the local audio tracks. Connection loss stops capture until the participant enables it again. Consent withdrawal stops both microphones. The four saved turns still support both report languages.
 - Qualify physical acoustic echo, simultaneous speech and mobile microphone recovery on a desktop and phone before the public rehearsal.
+
+
+## Experimental acceptance
+
+Qualify a direction with a real authenticated response and healthy configured worker. Compare identical inputs, retain failed runs, and review critical facts bilingually. A later test room must demonstrate consent withdrawal, original replay, attribution, report evidence, ordered playback and explicit return to Standard.

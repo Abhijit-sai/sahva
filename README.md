@@ -85,3 +85,8 @@ Create a room, then open its invitation in a second browser profile. Choose Engl
 Open **Audio options** for single-phrase recording and playback settings. Each incoming message shows the translated caption and replay in your listening language. Select **Original** on that message for the original recording and transcript.
 
 With headphones, select **Using headphones · speak to interrupt playback** to start your reply while the translation is playing. **Mute microphone** releases your microphone. For a single phrase, use **Speak live** and enable incoming voice on the listener's side. Select **End call** to review the same meeting outcomes in either language and replay the supporting turns. [Delivery phases](docs/14_LIVE_DEMO_PHASES.md)
+
+
+## Experimental self-hosted translation
+
+Sahva’s public meetings use LiveKit and Sarvam. The local Translation Lab is the evaluation surface for the proposed private IndicTrans2 worker. Start with the [decision](docs/adr/0008_self_hosted_translation_eval.md), [phase plan](docs/08_WBS_AND_PHASE_PLAN.md) and [research pack](docs/Sahva_SelfHosted_Translation_Pack/README.md).

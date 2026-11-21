@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { database, dataDir, local, type Query } from "./db.ts";
 import {
+  roomLanguages,
   consentVersion,
   meetingConsent,
   type Member,
@@ -25,7 +26,7 @@ export class Problem extends Error {
     this.code = code;
   }
 }
-const lang = z.enum(["en-IN", "te-IN"]);
+const lang = z.enum(roomLanguages);
 const profile = z.object({
   name: z.string().trim().min(1).max(60),
   listeningLanguage: lang,
@@ -167,6 +168,15 @@ export async function enter(input: unknown, existing?: string) {
         [id, form.title, hash(invite), transport],
       );
     }
+    if (
+      transport === "phrase" &&
+      (form.listeningLanguage === "hi-IN" || form.speakingLanguage === "hi-IN")
+    )
+      throw new Problem(
+        400,
+        "LANGUAGE",
+        "Choose a group meeting to use Hindi.",
+      );
     if (
       form.consentVersion !==
       (transport === "livekit" ? meetingConsent : consentVersion)

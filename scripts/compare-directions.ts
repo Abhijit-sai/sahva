@@ -1,11 +1,10 @@
 /** Isolated provider comparison. Both paths consume the same normalized audio samples. */
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { mkdir, mkdtemp, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { promisify } from "node:util";
+import { loadRecording, wav as encodeWav } from "./s2st/audio.ts";
 import WebSocket from "ws";
 import { z } from "zod";
 import { SarvamSpeech, type Language } from "../lib/providers/sarvam.ts";
@@ -20,7 +19,6 @@ if (!key) throw Error("SARVAM_API_KEY is required");
 const speech = new SarvamSpeech(key);
 await mkdir(".sahva", { recursive: true });
 const resultFolder = await mkdtemp(".sahva/directions-");
-const decode = promisify(execFile);
 const eventSchema = z.object({
   event: z.string(),
   text: z.string().max(4000).optional(),
@@ -29,60 +27,14 @@ const elapsed = (since: number) => Math.round(performance.now() - since);
 
 async function load(source: Language) {
   const path = join(folder, source === "te-IN" ? "telugu.wav" : "english.wav");
-  if ((await stat(path)).size > 4_000_000)
-    throw Error("Input exceeds the room audio limit");
-  const { stdout: pcm } = await decode(
-    "ffmpeg",
-    [
-      "-nostdin",
-      "-v",
-      "error",
-      "-protocol_whitelist",
-      "file",
-      "-f",
-      "wav",
-      "-i",
-      path,
-      "-map",
-      "0:a:0",
-      "-ac",
-      "1",
-      "-ar",
-      "16000",
-      "-t",
-      "25.1",
-      "-f",
-      "s16le",
-      "pipe:1",
-    ],
-    {
-      encoding: "buffer",
-      maxBuffer: 850000,
-      timeout: 10000,
-      windowsHide: true,
-    },
-  );
-  if (pcm.length < 6400 || pcm.length > 800000 || pcm.length % 2)
-    throw Error("Use one 0.2–25 second WAV phrase per direction.");
-  const header = Buffer.alloc(44);
-  header.write("RIFF");
-  header.writeUInt32LE(36 + pcm.length, 4);
-  header.write("WAVEfmt ", 8);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
-  header.writeUInt32LE(16000, 24);
-  header.writeUInt32LE(32000, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write("data", 36);
-  header.writeUInt32LE(pcm.length, 40);
-  const wav = Buffer.concat([header, pcm]);
+  const pcm = await loadRecording(path);
+  const wav = encodeWav(pcm, 16000);
   return {
     source,
     target: source === "te-IN" ? ("en-IN" as const) : ("te-IN" as const),
     pcm,
     wav,
+    pcmSha256: createHash("sha256").update(pcm).digest("hex"),
     hash: createHash("sha256").update(wav).digest("hex"),
   };
 }
@@ -172,6 +124,30 @@ async function compare(clip: Awaited<ReturnType<typeof load>>) {
   const baseVoice = await speech.synthesize(baseMt.text, target);
   const baseCompleteMs = elapsed(baseStart);
   await writeFile(join(dir, "base.wav"), baseVoice.audio);
+  await writeFile(
+    join(dir, "offline.json"),
+    JSON.stringify(
+      {
+        source,
+        target,
+        sha256: hash,
+        pcmSha256: clip.pcmSha256,
+        sourceText: base.text,
+        translatedText: baseMt.text,
+        asrMs: base.elapsedMs,
+        mtMs: baseMt.elapsedMs,
+        ttsMs: baseVoice.elapsedMs,
+        totalMs: baseCompleteMs,
+        outputSha256: createHash("sha256")
+          .update(baseVoice.audio)
+          .digest("hex"),
+        speaker: baseVoice.speaker,
+        models: ["saaras:v4", "mayura:v1", "bulbul:v4-flash"],
+      },
+      null,
+      2,
+    ),
+  );
   return async function stream() {
     const start = performance.now();
     const live = await streamTranscript(source, pcm);
@@ -229,6 +205,8 @@ async function compare(clip: Awaited<ReturnType<typeof load>>) {
       source,
       target,
       sha256: hash,
+      pcmSha256: clip.pcmSha256,
+      streamWavSha256: createHash("sha256").update(audio).digest("hex"),
       inputMs: pcm.length / 32,
       baseFileProcessingMs: baseCompleteMs,
       baseAsrMs: base.elapsedMs,
@@ -258,15 +236,30 @@ async function compare(clip: Awaited<ReturnType<typeof load>>) {
 }
 
 const inputs = await Promise.all([load("te-IN"), load("en-IN")]);
-const trials = await Promise.all(inputs.map(compare));
-// Start both recordings together. Each socket, transcript and output buffer belongs to one direction.
-const results = await Promise.allSettled(trials.map((run) => run()));
-for (const result of results)
-  if (result.status === "rejected") {
-    console.error(
-      "Direction failed:",
-      result.reason instanceof Error ? result.reason.message : "unknown",
-    );
-    process.exitCode = 1;
-  }
+const preparations = await Promise.allSettled(inputs.map(compare));
+// Begin both paced streams together when both offline arms succeeded.
+await Promise.all(
+  preparations.map(async (arm, i) => {
+    const clip = inputs[i];
+    try {
+      if (arm.status === "rejected") throw arm.reason;
+      await arm.value();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "UNKNOWN_FAILURE";
+      const phase = arm.status === "rejected" ? "offline" : "paced";
+      await writeFile(
+        join(resultFolder, clip.source, "failure.json"),
+        JSON.stringify({
+          source: clip.source,
+          target: clip.target,
+          pcmSha256: clip.pcmSha256,
+          phase,
+          code,
+        }),
+      );
+      console.error(clip.source, phase, "failed:", code);
+      process.exitCode = 1;
+    }
+  }),
+);
 console.log("Private same-recording comparison:", resultFolder);

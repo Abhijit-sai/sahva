@@ -31,3 +31,8 @@
 
 ## Important distinction
 The provider API documentation verifies *capability and request contracts*, not that Sahva has already been implemented, tested, benchmarked or deployed. All phase reports begin at NOT STARTED until verified in the live repository.
+
+
+## Self-hosted sources checked 21 November 2026
+
+Hub metadata identifies both gated MIT checkpoints. Toolkit dependencies and laptop or vendor examples establish no Sahva performance result. [English to Indic](https://huggingface.co/ai4bharat/indictrans2-en-indic-dist-200M) · [Indic to English](https://huggingface.co/ai4bharat/indictrans2-indic-en-dist-200M) · [Toolkit](https://github.com/VarunGumma/IndicTransToolkit) · [EC2 specifications](https://docs.aws.amazon.com/ec2/latest/instancetypes/ac.html)
