@@ -189,3 +189,5 @@ STREAM-01 group demo extension passed the three-person public rehearsal for Engl
 | PRES-05 | PRES-04 | Guarded pilot and explicit release decision |
 
 CALL-01 and CALL-02 have local Chrome and worker evidence. CALL-03/04 have partial directional and queue evidence. The final provider-backed retest covered one Telugu source and two recipients. Phone output, complete bidirectional and third-participant human conversation, retry/reconnect acoustics, and the presenter gate are open. [Measured results](../qa/S2ST_BENCHMARK.md)
+
+Production rehearsal release 3a2802f enables interpreted audio in ordinary Group meetings by operator authorization. Public invite, two RTC joins, consent shutdown and owner end passed with silent inputs on 22 November. Physical voice acceptance remains open. [Release evidence](../PROJECT_SUMMARY.md)
