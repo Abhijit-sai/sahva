@@ -23,3 +23,13 @@ Advance to test-room integration only after real two-way output, repeatable earl
 ## Trial decision · 21 November 2026
 
 Retain Sarvam for the public meeting. Both Gemini directions worked concurrently, but the matched trial exposed errors in quantities, negation, code-switching and question intent. A fresh candidate or scoped mitigation can reopen the trial after it passes these specific recordings and held-out equivalents. Human evaluation of prosody and device acoustics remains open. [Benchmark and reproducible evidence](../../qa/S2ST_BENCHMARK.md)
+
+## Reopened call trial · 22 November 2026
+
+The owner selected direct Gemini Live Translate for the next call trial in English ↔ Telugu and English ↔ Hindi. Compare the existing translation instructions and a conversational-clause preset on matched recordings. In the proposed meeting path, each consenting source mic keeps a session open per eligible target language. Feed progressive returned PCM to its authorized listener output, preserve speaker attribution, and keep archive processing independent. A one-way session has only its source speaker's context. Preserve ambiguous short replies. The ADR remains proposed pending direction-specific quality and device evidence. [Prompt and evaluation protocol](../../qa/S2ST_BENCHMARK.md#gemini-conversational-interpretation--22-november-2026)
+
+## Owner direction · 22 November 2026 · current meeting work
+
+Only Gemini Live Translate may generate the final interpreted voice in this work, in both directions and in translated replay. The quiet underlying voice is the participant's original microphone. Use the same captured Gemini output for replay where the speaker, language, consent and source interval are established. If that output is unavailable, surface the interruption and retain the authorized original. Other provider experiments are paused. This decision selects a provider for the work. Physical hearing and semantic acceptance remain open.
+
+The local implementation uses gemini-3.5-live-translate-preview for regular group calls. Each listener's private replay stores the 24 kHz mix submitted to their LiveKit publication. Preserve existing recordings with their original provenance. Gemini's live source transcripts with explicit finality can support a report. Unconfirmed source excerpts remain drafts until corrected by the speaker. Historical weight and comparison experiments remain evaluation evidence. Promotion to production and the human listening gate remain open.

@@ -9,8 +9,9 @@ import {
 } from "react";
 import type { Room } from "livekit-client";
 import { languages, type Member } from "../lib/shared";
-import { voices } from "../lib/voices";
-import { MeetingMicrophone } from "./meeting-microphone";
+import { rememberVoice, storedVoice, VoicePicker } from "./voice-picker";
+import { api } from "./client";
+import { MeetingMicrophone, type MicState } from "./meeting-microphone";
 
 type DeviceContext = AudioContext & {
   setSinkId?: (id: string) => Promise<void>;
@@ -21,12 +22,16 @@ export function InterpretedMeeting({
   me,
   members,
   processing,
+  radio = false,
+  issue,
   onDecoded,
 }: {
   id: string;
   me: Member;
   members: Member[];
   processing?: "Translating" | "Catching up";
+  radio?: boolean;
+  issue?: string;
   onDecoded: (segment: string, at: number) => void;
 }) {
   const observe = useRef(onDecoded);
@@ -38,15 +43,16 @@ export function InterpretedMeeting({
   const volume = useRef<GainNode | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [incomingVoice, setIncomingVoice] = useState<string>(() =>
-    me.listening === "te-IN"
-      ? "tarun_te_narration"
-      : voices[me.listening][0].id,
+    storedVoice(id, me.id, me.listening, true),
   );
+  const [savingVoice, setSavingVoice] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
+  const [micState, setMicState] = useState<MicState>("off");
   const [headphones, setHeadphones] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [level, setLevel] = useState(100);
   const [connection, setConnection] = useState<
-    "off" | "listening" | "reconnecting"
+    "off" | "connecting" | "listening" | "reconnecting"
   >("off");
   const [active, setActive] = useState("");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -70,6 +76,7 @@ export function InterpretedMeeting({
     setLiveVoice(false);
     setActive("");
     setConnection("off");
+    setSavingVoice(false);
     setMuted(false);
     setMicMuted(false);
     setDevice("");
@@ -93,8 +100,9 @@ export function InterpretedMeeting({
     };
   }, [leave]);
   useEffect(() => {
-    if (volume.current) volume.current.gain.value = muted || review ? 0 : 1;
-  }, [muted, review]);
+    if (volume.current)
+      volume.current.gain.value = muted || review ? 0 : level / 100;
+  }, [muted, review, level, connection]);
 
   async function unlock(test = false) {
     try {
@@ -144,10 +152,16 @@ export function InterpretedMeeting({
     const room = new Room();
     output.current = room;
     const gain = ctx.createGain();
-    gain.gain.value = reviewing.current ? 0 : 1;
+    gain.gain.value = reviewing.current || muted ? 0 : level / 100;
     volume.current = gain;
     gain.connect(ctx.destination);
     const readers = new Map<string, () => void>();
+    const playing = new Map<string, string>();
+    function reflectPlayback() {
+      if (output.current !== room) return;
+      setActive([...playing.values()].join(" · "));
+      setLiveVoice(playing.size > 0);
+    }
     function clear() {
       for (const stop of readers.values()) stop();
       readers.clear();
@@ -157,6 +171,8 @@ export function InterpretedMeeting({
       }
     }
     room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
+      const fields = pub.trackName.split("/");
+      const mixed = radio && fields.length === 4 && fields[0] === "radio";
       const [
         target,
         speaker,
@@ -167,10 +183,12 @@ export function InterpretedMeeting({
         endSample,
         revision,
         voice,
-      ] = pub.trackName.split("/");
+      ] = mixed ? fields.slice(1) : fields;
       if (
         output.current !== room ||
-        participant.identity !== "interpretation" ||
+        (radio
+          ? !mixed || participant.identity !== "radio-" + segment
+          : participant.identity !== "interpretation") ||
         target !== me.listening ||
         speaker === me.id ||
         !segment ||
@@ -196,9 +214,20 @@ export function InterpretedMeeting({
           ctx!.state === "running" &&
           gain.gain.value > 0 &&
           samples.some((s) => Math.abs(s) > 0.008);
-        if (voiced && !observed) {
+        if (voiced && !observed && mixed) {
+          observed = true;
+          if (performance.getEntriesByName("sahva.receiver-mix").length >= 128)
+            performance.clearMarks("sahva.receiver-mix");
+          performance.mark("sahva.receiver-mix", {
+            detail: { speaker, target, trackSid: pub.trackSid },
+          });
+        } else if (voiced && !observed) {
           observed = true;
           observe.current(segment, performance.now());
+          void api("/" + id + "/meeting/decoded", {
+            outputRoom: room.name,
+            segment,
+          }).catch(() => {});
           if (
             performance.getEntriesByName("sahva.receiver-decoded").length >= 128
           )
@@ -218,16 +247,20 @@ export function InterpretedMeeting({
             },
           });
         }
-        setLiveVoice(voiced);
-        setActive(
-          voiced
-            ? (voice === "original"
+        if (voiced)
+          playing.set(
+            pub.trackSid,
+            (mixed
+              ? "Receiving audio · "
+              : voice === "original"
                 ? "Original audio playing · "
-                : "Translated audio playing · ") + name
-            : "",
-        );
+                : "Translated audio playing · ") + name,
+          );
+        else playing.delete(pub.trackSid);
+        reflectPlayback();
       }, 40);
       readers.set(pub.trackSid, () => {
+        playing.delete(pub.trackSid);
         clearInterval(timer);
         source.disconnect();
         analyser.disconnect();
@@ -238,10 +271,7 @@ export function InterpretedMeeting({
     room.on(RoomEvent.TrackUnsubscribed, (_, pub) => {
       readers.get(pub.trackSid)?.();
       readers.delete(pub.trackSid);
-      if (output.current === room) {
-        setActive("");
-        setLiveVoice(false);
-      }
+      reflectPlayback();
     });
     room.on(RoomEvent.Reconnecting, () => {
       if (output.current === room) setConnection("reconnecting");
@@ -258,7 +288,19 @@ export function InterpretedMeeting({
         );
       }
     });
-    await room.connect(url, token);
+    try {
+      await room.connect(url, token);
+    } catch (error) {
+      if (output.current === room) {
+        output.current = null;
+        gain.disconnect();
+        volume.current = null;
+        setConnection("off");
+      }
+      clear();
+      await room.disconnect().catch(() => {});
+      throw error;
+    }
     if (output.current !== room) {
       await room.disconnect();
       throw Error("Left meeting");
@@ -266,86 +308,223 @@ export function InterpretedMeeting({
     setConnection("listening");
     setMessage("");
   }
+  async function chooseVoice(voice: string) {
+    const room = output.current;
+    if (room) {
+      setSavingVoice(true);
+      try {
+        await api("/" + id + "/meeting/voice", {
+          outputRoom: room.name,
+          voice,
+        });
+        if (!alive.current || output.current !== room) return;
+      } catch (error) {
+        if (alive.current && output.current === room)
+          setMessage((error as Error).message);
+        return;
+      } finally {
+        if (alive.current && output.current === room) setSavingVoice(false);
+      }
+    }
+    rememberVoice(id, me.id, me.listening, voice, true);
+    setIncomingVoice(voice);
+    setMessage("");
+  }
+  const micReady = micState === "ready";
+  const micHeld = !radio && !headphones && liveVoice;
+  const micStatus =
+    micState === "ready"
+      ? micMuted
+        ? "Muted"
+        : review
+          ? "Paused for replay"
+          : micHeld
+            ? "Paused during playback"
+            : "Microphone on"
+      : {
+          off: "Off",
+          starting: "Connecting microphone…",
+          reconnecting: "Reconnecting",
+          failed: "Microphone unavailable",
+        }[micState];
+  const outputSilent = muted || level === 0;
+  const listenStatus = blocked
+    ? "Audio blocked"
+    : connection === "off"
+      ? "Off"
+      : connection === "connecting"
+        ? "Connecting…"
+        : connection === "reconnecting"
+          ? "Reconnecting"
+          : outputSilent
+            ? "Incoming audio muted"
+            : review
+              ? "Paused for replay"
+              : active || processing || "Listening";
   return (
-    <section aria-label="Interpreted meeting audio">
-      <h3>Meeting audio</h3>
-      <p>
-        You speak {languages[me.speaking]} and hear {languages[me.listening]}.
-      </p>
-      <p role="status">
-        {blocked
-          ? "Audio blocked"
-          : connection === "reconnecting"
-            ? "Reconnecting"
-            : connection === "off"
-              ? "Meeting audio off"
-              : muted
-                ? "Incoming audio muted"
-                : review
-                  ? "Reviewing recording"
-                  : active ||
-                    processing ||
-                    (members.some((m) => m.recording)
-                      ? "Speaker active"
-                      : "Listening")}
-      </p>
-      {blocked && (
-        <button onClick={() => void unlock()}>Enable meeting audio</button>
-      )}
-      {connection === "off" && (
-        <button onClick={() => void unlock(true)}>Test speaker</button>
-      )}
-      {devices.length > 0 && (
-        <label>
-          Speaker{" "}
-          <select
-            value={device}
-            onChange={async (e) => {
-              const next = e.target.value;
-              try {
-                await context.current?.setSinkId?.(next);
-                setDevice(next);
-                setMessage("");
-              } catch {
-                setMessage(
-                  "Speaker switch failed. Check the system output device.",
-                );
+    <section className="audio-console" aria-label="Interpreted meeting audio">
+      <div className="console-heading">
+        <div>
+          <h2>Meeting audio</h2>
+          <p>
+            {radio
+              ? "Hear each speaker under their live Gemini interpretation."
+              : "Incoming speech plays automatically in your listening language."}
+          </p>
+        </div>
+        <MeetingMicrophone
+          id={id}
+          onMicState={setMicState}
+          onReceiveFailed={() => setConnection("off")}
+          voice=""
+          incomingVoice={incomingVoice}
+          suppress={micMuted || micHeld || review}
+          enableSound={() => {
+            setConnection("connecting");
+            return unlock();
+          }}
+          disableSound={leave}
+          connectOutput={connectOutput}
+        />
+      </div>
+      <div className="audio-routes">
+        <div className="audio-route" role="group" aria-label="Your microphone">
+          <div className="route-title">
+            <span>Your microphone</span>
+            <strong>{languages[me.speaking]}</strong>
+          </div>
+          <div className="route-action">
+            <span
+              role="status"
+              className="channel-status"
+              data-active={micReady && !micMuted && !micHeld && !review}
+            >
+              {micStatus}
+            </span>
+            {micReady && (
+              <button
+                className="console-control"
+                aria-pressed={micMuted}
+                onClick={() => setMicMuted(!micMuted)}
+              >
+                {micMuted ? "Unmute microphone" : "Mute microphone"}
+              </button>
+            )}
+          </div>
+        </div>
+        <div
+          className="audio-route"
+          role="group"
+          aria-label="Your incoming audio"
+        >
+          <div className="route-title">
+            <span>You hear</span>
+            <strong>{languages[me.listening]}</strong>
+          </div>
+          <div className="route-action">
+            <span
+              role="status"
+              className="channel-status"
+              data-active={
+                connection === "listening" &&
+                !blocked &&
+                !muted &&
+                level > 0 &&
+                !review
               }
-            }}
-          >
-            <option value="">System default</option>
-            {devices.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || "Speaker " + (i + 1)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {connection === "off" && (
-        <label>
-          Incoming voice{" "}
-          <select
+            >
+              {listenStatus}
+            </span>
+            {blocked ? (
+              <button onClick={() => void unlock()}>
+                Enable meeting audio
+              </button>
+            ) : connection === "off" ? (
+              <button
+                className="console-control"
+                onClick={() => void unlock(true)}
+              >
+                Test speaker
+              </button>
+            ) : (
+              connection === "listening" && (
+                <button
+                  className="console-control"
+                  aria-pressed={outputSilent}
+                  onClick={() => {
+                    if (level === 0) setLevel(100);
+                    setMuted(!outputSilent);
+                  }}
+                >
+                  {outputSilent
+                    ? "Unmute incoming audio"
+                    : "Mute incoming audio"}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="console-options">
+        {!radio && (
+          <VoicePicker
+            incoming
+            target={me.listening}
             value={incomingVoice}
-            onChange={(e) => setIncomingVoice(e.target.value)}
-          >
-            {voices[me.listening].map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {connection === "listening" && (
-        <>
-          <button
-            aria-pressed={micMuted}
-            onClick={() => setMicMuted(!micMuted)}
-          >
-            {micMuted ? "Unmute microphone" : "Mute microphone"}
-          </button>
+            disabled={
+              savingVoice ||
+              connection === "connecting" ||
+              connection === "reconnecting"
+            }
+            onChange={(voice) => void chooseVoice(voice)}
+          />
+        )}
+        {connection === "listening" && (
+          <label className="incoming-level">
+            Listening volume
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={level}
+              aria-valuetext={level + "%"}
+              disabled={muted}
+              onChange={(e) => setLevel(Number(e.target.value))}
+            />
+            <output>{level}%</output>
+          </label>
+        )}
+        {devices.length > 0 && (
           <label>
+            Speaker
+            <select
+              value={device}
+              onChange={async (e) => {
+                const next = e.target.value;
+                try {
+                  await context.current?.setSinkId?.(next);
+                  setDevice(next);
+                  setMessage("");
+                } catch {
+                  setMessage(
+                    "Speaker switch failed. Check the system output device.",
+                  );
+                }
+              }}
+            >
+              <option value="">System default</option>
+              {devices
+                .filter((d) => d.deviceId !== "default")
+                .map((d, i) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || "Speaker " + (i + 1)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
+        {micReady && !radio && (
+          <label className="check">
             <input
               type="checkbox"
               checked={headphones}
@@ -353,22 +532,15 @@ export function InterpretedMeeting({
             />
             Using headphones · speak during interpretation
           </label>
-        </>
+        )}
+      </div>
+      {radio && (
+        <small>
+          For overlapping speech, use headphones. Gemini supplies the
+          interpreted voice.
+        </small>
       )}
-      <MeetingMicrophone
-        id={id}
-        voice=""
-        incomingVoice={incomingVoice}
-        suppress={micMuted || (!headphones && liveVoice) || review}
-        enableSound={unlock}
-        disableSound={leave}
-        connectOutput={connectOutput}
-      />
-      {connection === "listening" && (
-        <button aria-pressed={muted} onClick={() => setMuted(!muted)}>
-          {muted ? "Unmute incoming audio" : "Mute incoming audio"}
-        </button>
-      )}
+      {issue && <p role="alert">{issue}</p>}
       {message && <p role="alert">{message}</p>}
     </section>
   );

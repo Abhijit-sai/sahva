@@ -359,6 +359,53 @@ article form {
 .member strong {
   overflow-wrap: anywhere;
 }
+.call-layout.interpreted-layout {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+.participant-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
+  gap: 8px;
+}
+.participant-tiles .member {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: center;
+  padding: 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.mic-status {
+  font-weight: 600;
+}
+.transcript-panel {
+  margin-block: 16px;
+  padding: 14px;
+  background: var(--paper);
+  border-radius: 8px;
+}
+.transcript-panel p:last-child {
+  margin-bottom: 0;
+}
+.radio-captions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  gap: 12px;
+  margin-block: 8px;
+}
+.radio-captions > div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.radio-captions > div:last-child { background: #e4f3ed; }
+@media (max-width: 760px) {
+  .call-layout.interpreted-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .call-layout .live-heading h3 {
   font:
     600 16px/1.35 "Segoe UI",
@@ -457,4 +504,82 @@ article form {
   .chat-message {
     max-width: 95%;
   }
+}
+
+.audio-console {
+  --console-line: #476a62;
+  --console-muted: #c1d8cf;
+  margin-top: 22px;
+  padding: clamp(18px, 2.5vw, 32px);
+  background: #153d37;
+  border-color: #153d37;
+  color: #f6faf6;
+}
+.console-heading, .route-action, .route-title, .console-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.console-heading h2, .waiting-console h2 { margin-bottom: 6px; }
+.console-heading p, .waiting-console p { color: var(--console-muted); margin: 0; }
+.audio-console small { color: var(--console-muted); }
+.audio-console button {
+  min-height: 44px;
+  margin: 0;
+  font-weight: 600;
+  background: #dbf6e6;
+  color: #163d38;
+  border-color: #dbf6e6;
+}
+.console-heading > div { min-width: 0; }
+.console-heading > div:last-child { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.audio-console .console-control { background: transparent; color: #f6faf6; border-color: #87a69a; }
+.audio-console button[aria-pressed="true"] { background: #f7ead3; color: #533b26; }
+.audio-console [role="alert"] { color: #ffddc9; margin: 8px 0 0; }
+.audio-console :focus-visible { outline-color: #ffd393; }
+.audio-routes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.audio-route { min-width: 0; padding: 14px 16px; border: 1px solid var(--console-line); border-radius: 10px; }
+.route-title { color: var(--console-muted); font-size: 14px; }
+.route-title strong { color: #fcfffc; font-size: 16px; }
+.route-action { min-height: 44px; margin-top: 8px; }
+.channel-status { display: flex; align-items: center; gap: 9px; overflow-wrap: anywhere; }
+.channel-status::before {
+  content: ""; flex: 0 0 9px; width: 9px; height: 9px;
+  border-radius: 50%; border: 1px solid #a0b8af;
+}
+.channel-status[data-active="true"]::before { background: #9ae4b5; border-color: #9ae4b5; }
+.console-options { justify-content: flex-start; align-items: end; gap: 12px 24px; }
+.console-options label { margin: 14px 0 0; }
+.console-options select { min-height: 44px; }
+.console-options .check { align-items: center; min-height: 44px; }
+.console-options .check input { width: auto; height: 18px; margin: 0; }
+.audio-console > small { display: block; margin-top: 10px; }
+.console-options .incoming-level { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; }
+.incoming-level input { grid-column: 1; grid-row: 2; min-height: 44px; margin: 0; padding: 0; accent-color: #b1e9c6; }
+.incoming-level output { grid-column: 2; grid-row: 2; align-self: center; font-variant-numeric: tabular-nums; }
+.seat-count { display: inline-grid; place-items: center; min-width: 26px; height: 26px; margin-left: 9px; border-radius: 50%; background: #e5ede6; color: var(--accent); font: 600 14px/1 "Segoe UI",sans-serif; vertical-align: middle; }
+.interpreted-layout .participant-tiles .member { padding: 16px 10px; gap: 5px; background: #f7f9f4; }
+.participant-tiles .avatar { width: 44px; height: 44px; font-size: 19px; }
+.interpreted-layout .transcript-panel { background: transparent; padding: 20px 0 0; border-top: 1px solid var(--line); border-radius: 0; }
+.caption-pair { margin: 16px 0; }
+.radio-captions { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.radio-captions small, .own-caption small { display: block; margin-bottom: 8px; font-weight: 650; }
+.radio-captions > div:first-child { background: #f5f7f4; }
+.empty-captions p { color: var(--muted); font-size: 15px; }
+.own-caption { border-left: 3px solid var(--line); padding: 0 12px; margin-top: 12px; overflow-wrap: anywhere; }
+@media (max-width: 660px) {
+  .audio-routes { grid-template-columns: minmax(0,1fr); gap: 8px; }
+  .audio-console { margin-top: 16px; }
+  .audio-route { padding: 10px 12px; }
+  .console-options > label { max-width: 100%; }
+}
+@media (max-width: 400px) {
+  .radio-captions { grid-template-columns: minmax(0,1fr); }
 }

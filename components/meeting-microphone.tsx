@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Room } from "livekit-client";
 import { api } from "./client";
 
+export type MicState = "off" | "starting" | "ready" | "failed" | "reconnecting";
+
 export function MeetingMicrophone({
   id,
   voice,
@@ -11,6 +13,8 @@ export function MeetingMicrophone({
   disableSound,
   connectOutput,
   incomingVoice,
+  onMicState,
+  onReceiveFailed,
 }: {
   id: string;
   voice: string;
@@ -18,6 +22,8 @@ export function MeetingMicrophone({
   enableSound: () => Promise<void>;
   disableSound: () => void;
   incomingVoice?: string;
+  onMicState?: (state: MicState) => void;
+  onReceiveFailed?: () => void;
   connectOutput?: (url: string, token: string) => Promise<void>;
 }) {
   const rtc = useRef<Room | null>(null);
@@ -26,6 +32,19 @@ export function MeetingMicrophone({
     "off" | "connecting" | "on" | "reconnecting"
   >("off");
   const [error, setError] = useState("");
+  const [micState, setMicState] = useState<"starting" | "ready" | "failed">(
+    "starting",
+  );
+  const [receiveError, setReceiveError] = useState("");
+  useEffect(() => {
+    onMicState?.(
+      status === "on"
+        ? micState
+        : status === "connecting"
+          ? "starting"
+          : status,
+    );
+  }, [micState, onMicState, status]);
   const leave = useCallback(() => {
     const current = rtc.current;
     rtc.current = null;
@@ -43,10 +62,30 @@ export function MeetingMicrophone({
       .values()
       .next().value?.track?.mediaStreamTrack;
     if (mic) mic.enabled = !suppress;
-  }, [suppress, status]);
+  }, [suppress, status, micState]);
+  async function publishMic(room: Room) {
+    setMicState("starting");
+    setError("");
+    try {
+      await room.localParticipant.setMicrophoneEnabled(true);
+      if (rtc.current !== room) return;
+      setMicState("ready");
+    } catch (e) {
+      if (rtc.current !== room) return;
+      if (!connectOutput) throw e;
+      setMicState("failed");
+      setError(
+        e instanceof Error && e.name === "NotAllowedError"
+          ? "Microphone access is blocked. Allow it in your browser, then retry."
+          : "Microphone unavailable. Check the input device, then retry.",
+      );
+    }
+  }
   async function join() {
     setStatus("connecting");
     setError("");
+    setReceiveError("");
+    setMicState("starting");
     try {
       await enableSound();
       const { Room, RoomEvent } = await import("livekit-client");
@@ -90,11 +129,22 @@ export function MeetingMicrophone({
         { participantIdentity: "interpreter", allowAll: true },
       ]);
       if (connectOutput) {
-        if (!outputToken) throw Error("Interpreted output unavailable");
-        await connectOutput(url, outputToken);
-        if (rtc.current !== room) return;
-      }
-      await room.localParticipant.setMicrophoneEnabled(true);
+        // A failed input permission prompt must not tear down a working receiver.
+        setStatus("on");
+        const connectReceiver = async () => {
+          try {
+            if (!outputToken) throw Error("Missing output credential");
+            await connectOutput(url, outputToken);
+          } catch {
+            if (rtc.current !== room) return;
+            onReceiveFailed?.();
+            setReceiveError(
+              "Incoming audio could not connect. Leave and rejoin meeting audio to retry.",
+            );
+          }
+        };
+        await Promise.all([connectReceiver(), publishMic(room)]);
+      } else await publishMic(room);
       if (rtc.current === room) setStatus("on");
     } catch (e) {
       leave();
@@ -121,6 +171,8 @@ export function MeetingMicrophone({
             leave();
             disableSound();
             setStatus("off");
+            setReceiveError("");
+            setError("");
           }}
         >
           Leave meeting audio
@@ -130,6 +182,16 @@ export function MeetingMicrophone({
         <p role="status">Reconnecting microphone…</p>
       )}
       {error && <p role="alert">{error}</p>}
+      {receiveError && <p role="alert">{receiveError}</p>}
+      {status === "on" && micState === "failed" && (
+        <button
+          onClick={() => {
+            if (rtc.current) void publishMic(rtc.current);
+          }}
+        >
+          Retry microphone
+        </button>
+      )}
     </div>
   );
 }

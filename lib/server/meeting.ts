@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { interpretedRoom } from "./interpretation-flag.ts";
-export { interpretedRoom };
-import { MeetingOutputs } from "./interpretation-output.ts";
+import { interpretedRoom, radioRoom } from "./interpretation-flag.ts";
+export { interpretedRoom, radioRoom };
+import { outputCredential, openPcmTrack } from "./interpretation-output.ts";
+import { RadioMeeting } from "./radio-meeting.ts";
 import { AccessToken, TrackSource } from "livekit-server-sdk";
 import type {
   AudioStream,
@@ -9,52 +10,67 @@ import type {
   RemoteTrack,
 } from "@livekit/rtc-node";
 import { roomState, Problem } from "./rooms.ts";
-import { processStage } from "./turns.ts";
+import { MeetingArchive } from "./meeting-archive.ts";
 import { database } from "./db.ts";
-import {
-  beginLive,
-  appendFrame,
-  finishLive,
-  committedMeetingPhrase,
-  interpretDraft,
-  cancelRoomStream,
-} from "./live.ts";
-import { otherLanguage } from "../shared.ts";
-import { supportsVoice } from "../voices.ts";
+import { cancelRoomStream } from "./live.ts";
+import { type Language } from "../shared.ts";
 
 type Bridge = {
   rtc: RtcRoom;
   epoch: number;
   connected: Promise<void>;
   stop: AbortController;
-  outputs: MeetingOutputs;
+  listeners: Map<string, AbortController>;
+  radio: RadioMeeting;
+  archive: MeetingArchive;
+  speaking: Map<string, Language>;
   inputs: Map<string, AbortController>;
-  voices: Map<string, string>;
   issues: Map<string, string>;
   idle: ReturnType<typeof setTimeout>;
 };
 const holder = globalThis as typeof globalThis & {
   sahvaMeetings?: Map<string, Bridge>;
 };
-const bridges = (holder.sahvaMeetings ??= new Map());
+const bridges = (holder.sahvaMeetings ??= new Map<string, Bridge>());
+const closing = new Map<string, Promise<void>>();
 const scope = (id: string, epoch: number) => "sahva-" + id + "-" + epoch;
-export function interpretationState(id: string, person: string) {
-  return bridges.get(id)?.outputs.state(person);
+export function radioCaptions(id: string, person: string) {
+  return bridges.get(id)?.radio?.captions(person) ?? [];
+}
+// Human source-room grants permit only microphone publications. Page presence alone is insufficient.
+export function connectedMicrophones(id: string, epoch: number) {
+  const b = bridges.get(id);
+  if (!b || b.epoch !== epoch) return [];
+  return Array.from(b.rtc.remoteParticipants.values())
+    .filter((participant) =>
+      Array.from(participant.trackPublications.values()).some(
+        (pub) => pub.subscribed && pub.track,
+      ),
+    )
+    .map((participant) => participant.identity);
 }
 export function meetingIssues(id: string) {
   return Object.fromEntries(bridges.get(id)?.issues ?? []);
 }
-
 export function stopMeeting(id: string) {
   const b = bridges.get(id);
-  if (!b) return;
+  if (!b) return closing.get(id);
+  const writes = b.radio.pendingWrites();
   bridges.delete(id);
   clearTimeout(b.idle);
   b.stop.abort();
-  b.outputs.close();
+  for (const listener of b.listeners.values()) listener.abort();
+  b.listeners.clear();
   for (const input of b.inputs.values()) input.abort();
   cancelRoomStream(id);
   void b.rtc.disconnect().catch(() => {});
+  const finishing = writes
+    .then(() => b.archive.finish())
+    .finally(() => {
+      if (closing.get(id) === finishing) closing.delete(id);
+    });
+  closing.set(id, finishing);
+  return finishing;
 }
 
 async function credential(
@@ -81,134 +97,38 @@ async function credential(
   return token.toJwt();
 }
 
-// Each subscribed microphone has its own ordered reader, pre-roll and ASR session.
-async function interpretTrack(
+async function radioInput(
   b: Bridge,
-  id: string,
   person: string,
   track: RemoteTrack,
   Stream: typeof AudioStream,
-  trackStop: AbortSignal,
+  stop: AbortSignal,
 ) {
-  const stream = new Stream(track, {
+  const lang = b.speaking.get(person);
+  if (!b.radio || !lang || !track.sid) return;
+  const ended = new AbortController();
+  const signal = AbortSignal.any([stop, ended.signal]);
+  const feed = b.radio.source(person, lang, track.sid, signal);
+  const reader = new Stream(track, {
     sampleRate: 16000,
     numChannels: 1,
-    frameSizeMs: 100,
-  });
-  const reader = stream.getReader();
-  const abort = () => {
+    frameSizeMs: 20,
+  }).getReader();
+  const cancel = () => {
     void reader.cancel().catch(() => {});
   };
-  const signal = AbortSignal.any([b.stop.signal, trackStop]);
-  signal.addEventListener("abort", abort, { once: true });
-  const pre: Buffer[] = [];
-  let key: string | undefined,
-    seq = 0,
-    silent = 0,
-    onset = 0,
-    lastVoiced = 0;
-  let voice: string | undefined;
-  const clockEpoch = randomUUID();
-  let totalSamples = 0,
-    startSample = 0;
-  async function finish(cancel = false) {
-    if (!key) return;
-    const savedKey = key;
-    key = undefined;
-    if (!cancel && !signal.aborted && interpretedRoom(id) && track.sid) {
-      const phrase = await committedMeetingPhrase(id, person, savedKey, signal);
-      if (phrase)
-        b.outputs.dispatch(
-          {
-            ...phrase,
-            segmentId: savedKey,
-            speaker: person,
-            roomId: id,
-            epoch: b.epoch,
-            trackSid: track.sid,
-            clockEpoch,
-            sourceRevision: 0,
-            startSample,
-          },
-          signal,
-        );
-      else b.outputs.defer(person);
-    }
-    const saved = await finishLive(id, person, {
-      key: savedKey,
-      cancel: cancel || signal.aborted,
-      voice,
-      capture: { onset, lastVoiced, uncertainty: 100 },
-    });
-    if (
-      !cancel &&
-      saved &&
-      typeof saved === "object" &&
-      "id" in saved &&
-      typeof saved.id === "string"
-    ) {
-      const turnId = saved.id;
-      // Finalize the delivery while the microphone reader continues with the next phrase.
-      void (async () => {
-        for (let stage = 0; stage < 3; stage++)
-          if (!(await processStage(id, person, turnId, false))) break;
-      })().catch(() => {
-        /* Room polling resumes a persisted, unclaimed stage. */
-      });
-    }
-    seq = 0;
-    silent = 0;
-  }
+  signal.addEventListener("abort", cancel, { once: true });
   try {
     while (!signal.aborted) {
-      const { done, value } = await reader.read();
-      if (done || signal.aborted) break;
-      const samples = value.data;
-      totalSamples += samples.length;
-      let energy = 0;
-      for (const sample of samples) energy += sample * sample;
-      const voiced = energy / Math.max(1, samples.length) > 180 * 180;
-      const frame = Buffer.from(
-        new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
-      );
-      if (voiced) lastVoiced = Date.now();
-      if (!key) {
-        pre.push(frame);
-        if (pre.length > 4) pre.shift();
-        if (!voiced) continue;
-        onset = lastVoiced;
-        startSample =
-          totalSamples - pre.reduce((sum, bytes) => sum + bytes.length / 2, 0);
-        voice = b.voices.get(person);
-        key = (await beginLive(id, person, "livekit", b.epoch)).key;
-        signal.throwIfAborted();
-        if (!interpretedRoom(id)) b.issues.delete(person);
-      } else pre.push(frame);
-      let ended = false;
-      for (const piece of pre.splice(0)) {
-        const reply = appendFrame(id, person, {
-          key,
-          seq: seq++,
-          audio: piece.toString("base64"),
-        });
-        if (reply.text && !reply.done)
-          void interpretDraft(id, person, { key }).catch(() => {});
-        if (reply.done) {
-          ended = true;
-          break;
-        }
-      }
-      silent = voiced ? 0 : silent + 1;
-      if (ended || silent >= 14 || seq >= 245) await finish();
+      const frame = await reader.read();
+      if (frame.done || signal.aborted) break;
+      feed(new Int16Array(frame.value.data));
     }
   } finally {
-    signal.removeEventListener("abort", abort);
-    try {
-      await finish(signal.aborted);
-    } finally {
-      await reader.cancel().catch(() => {});
-      reader.releaseLock();
-    }
+    ended.abort();
+    signal.removeEventListener("abort", cancel);
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 }
 
@@ -230,15 +150,25 @@ function bridge(
   const { Room, RoomEvent, AudioStream } = rtcSdk;
   const rtc = new Room();
   const issues = new Map<string, string>();
+  const archive = new MeetingArchive(id, epoch, issues);
+  const radio = new RadioMeeting(
+    (room, name, publisher, stop) =>
+      openPcmTrack(rtcSdk, room, name, 24000, stop, publisher),
+    issues,
+    undefined,
+    archive,
+  );
   const b: Bridge = {
     rtc,
     epoch,
     connected: Promise.resolve(),
     stop: new AbortController(),
-    voices: new Map(),
+    archive,
     issues,
     inputs: new Map(),
-    outputs: new MeetingOutputs(id, epoch, rtcSdk, issues),
+    radio,
+    speaking: new Map(),
+    listeners: new Map(),
     idle: setTimeout(() => stopMeeting(id), 30000),
   };
   bridges.set(id, b);
@@ -256,7 +186,8 @@ function bridge(
   };
   rtc.on(RoomEvent.ParticipantConnected, emptyTimer);
   rtc.on(RoomEvent.ParticipantDisconnected, (participant) => {
-    b.outputs.leave(participant.identity);
+    b.listeners.get(participant.identity)?.abort();
+    b.listeners.delete(participant.identity);
     b.inputs.get(participant.identity)?.abort();
     emptyTimer();
   });
@@ -277,28 +208,26 @@ function bridge(
     const input = new AbortController();
     b.inputs.set(participant.identity, input);
     inputSids.set(participant.identity, track.sid);
-    void interpretTrack(
+    const live = radioInput(
       b,
-      id,
       participant.identity,
       track,
       AudioStream,
       input.signal,
-    )
-      .catch(() => {
-        if (!b.stop.signal.aborted)
-          b.issues.set(
-            participant.identity,
-            "Speech connection interrupted. Rejoin meeting audio to resume.",
-          );
-      })
-      .finally(() => {
-        input.abort();
-        if (b.inputs.get(participant.identity) === input) {
-          b.inputs.delete(participant.identity);
-          inputSids.delete(participant.identity);
-        }
-      });
+    ).catch(() => {
+      if (!input.signal.aborted)
+        b.issues.set(
+          participant.identity,
+          "Live input interrupted. Rejoin meeting audio.",
+        );
+    });
+    void live.finally(() => {
+      input.abort();
+      if (b.inputs.get(participant.identity) === input) {
+        b.inputs.delete(participant.identity);
+        inputSids.delete(participant.identity);
+      }
+    });
   });
   rtc.on(RoomEvent.Disconnected, () => {
     if (bridges.get(id) === b) stopMeeting(id);
@@ -320,13 +249,7 @@ function bridge(
     });
   return b;
 }
-export async function joinMeeting(
-  id: string,
-  person: string,
-  voice: unknown,
-  interpreted = false,
-  incomingVoice?: string,
-) {
+export async function joinMeeting(id: string, person: string) {
   const db = await database();
   const state = await roomState(db.query, id, person);
   if (state.room.transport !== "livekit" || !state.canRecord)
@@ -362,12 +285,14 @@ export async function joinMeeting(
       "MEETING_CHANGED",
       "Meeting audio changed. Rejoin to continue.",
     );
-  const outputToken =
-    interpreted && interpretedRoom(id)
-      ? await b.outputs.join(person, current.me.listening, incomingVoice)
-      : undefined;
-  if (supportsVoice(otherLanguage(state.me.speaking), voice))
-    b.voices.set(person, voice);
+  const room = ["sahva-output", id, b.epoch, person, randomUUID()].join("-");
+  const outputToken = await outputCredential(room, person, false);
+  b.stop.signal.throwIfAborted();
+  b.listeners.get(person)?.abort();
+  const listener = new AbortController();
+  b.listeners.set(person, listener);
+  b.radio.listen(person, current.me.listening, room, listener.signal);
+  b.speaking.set(person, current.me.speaking);
   return {
     outputToken,
     url: process.env.LIVEKIT_URL,

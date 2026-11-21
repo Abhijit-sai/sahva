@@ -14,9 +14,16 @@ export const voices = {
   ],
 } as const;
 
+export function voicesFor(language: Language): readonly {id:string; name:string}[] {
+  return Object.hasOwn(voices,language) ? voices[language as keyof typeof voices] : [];
+}
+export function defaultIncomingVoice(language: Language) {
+  return language === "te-IN" ? "tarun_te_narration" : (voicesFor(language)[0]?.id ?? "");
+}
+
 export function supportsVoice(
   language: Language,
   value: unknown,
 ): value is string {
-  return voices[language].some((voice) => voice.id === value);
+  return voicesFor(language).some((voice) => voice.id === value);
 }

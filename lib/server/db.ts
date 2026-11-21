@@ -31,10 +31,17 @@ async function connect(): Promise<Database> {
     await mkdir(dataDir(), { recursive: true });
     const db = await PGlite.create(resolve(dataDir(), "postgres"));
     const folder = resolve("supabase/migrations");
+    await db.exec("create schema if not exists sahva; create table if not exists sahva.local_migrations(name text primary key)");
     for (const file of (await readdir(folder))
       .filter((f) => /^\d+.*\.sql$/.test(f))
       .sort()) {
-      await db.exec(await readFile(resolve(folder, file), "utf8"));
+      const sql = await readFile(resolve(folder,file),"utf8");
+      await db.transaction(async tx => {
+        const applied = await tx.query("select name from sahva.local_migrations where name=$1",[file]);
+        if (applied.rows.length) return;
+        await tx.exec(sql);
+        await tx.query("insert into sahva.local_migrations values($1)",[file]);
+      });
     }
     const wrap =
       (c: Pick<PGlite, "query">): Query =>

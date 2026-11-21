@@ -7,8 +7,5 @@ export default function Home() {
     process.env.LIVEKIT_API_KEY &&
     process.env.LIVEKIT_API_SECRET
   );
-  const interpreted = offerMeeting &&
-    process.env.SAHVA_LIVE_MEDIA_INTERPRETATION === "1" &&
-    !process.env.SAHVA_LIVE_MEDIA_ROOM_ID;
-  return <Entry offerMeeting={offerMeeting} meeting={interpreted} />;
+  return <Entry offerMeeting={offerMeeting} meeting={offerMeeting} radio={offerMeeting} />;
 }

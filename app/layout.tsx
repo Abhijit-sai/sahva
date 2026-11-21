@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./style.css";
 export const metadata: Metadata = {
   title: "Sahva · Conversation rooms",
-  description: "A shared voice room for Telugu and English conversations.",
+  description: "A voice meeting with live interpretation in each listener’s language.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <Link className="brand" href="/">
             Sahva<span aria-hidden="true">◖◗</span>
           </Link>
-          <span>తెలుగు / English</span>
+          <span>Conversations without barriers</span>
         </header>
         {children}
       </body>

@@ -154,7 +154,7 @@ The offline MT runner requires the worker to echo the request UUID and language 
 
 The text-only engineering trial labels receipts `sourceKind=fictional-script`, records the exact input-text digest and uses a null PCM digest. Speaker-confirmed recordings require a PCM digest, verified references and processor consent. On CPU the worker returns `runtime.device=cpu`, `runtime.dtype=float32`, a null CUDA runtime and zero allocated GPU bytes.
 
-### Three-language meeting delivery
+### Historical three-language meeting delivery
 
 The LiveKit room snapshots the other members' listening languages when it saves a turn. Each delivery belongs to its source turn, correction revision and target language. Timeline and translated-media responses use the requesting member's listening preference. Group drafts are also listener-specific. Same-language recipients replay the original. A missing Sreekar service routes Telugu synthesis to Tarun. The delivery records the actual output voice so the UI and rehearsal can distinguish the two. The report language contract continues to offer English and Telugu.
 
@@ -165,4 +165,20 @@ Extend authenticated POST /api/v1/rooms/:id/meeting with an optional output cred
 
 For each final source segment, validate track owner, room, epoch, segmentId, monotonic frame order, source revision and source interval. Route to other eligible listeners only. Bind the committed target language and voice before synthesis. Reject duplicate and stale work. Published, subscribed, decoded, scheduled and device-heard are separate observations. On disconnect or withdrawal abort active requests, flush frames and remove publisher connections. Missed/deferred speech stays in the timeline for explicit replay.
 
+In the earlier Sarvam media experiment, `incomingVoice` selected a catalog voice for the member's listening language. In that build, authenticated `POST /api/v1/rooms/{id}/meeting/voice` accepts `{ outputRoom, voice }` and returns the confirmed voice. The server checks membership, consent, media epoch, current recipient connection and language. A successful change applies to segments committed after the update. Members sharing a target and voice can share synthesis. Same-language delivery carries original audio. A listener's choice is remembered on that browser for that room and participant.
+
 A future presenter rendition descriptor includes clock epoch, source anchor, translated duration, available video PTS range, discontinuity and ready/rebuffering state. Advance only when both media ranges cover the selected anchor.
+
+The consented meeting timeline exposes `connectedMicrophones` from the worker's current subscriptions. Membership, page presence and saved recordings are separate observations. A listener can receive media after declining microphone permission and enable the microphone separately. A failure to open the private output connection leaves an already published microphone available.
+
+The earlier per-segment client sent authenticated `POST /api/v1/rooms/{id}/meeting/decoded` with `{ outputRoom, segment }` after detecting non-silent decoded samples on an enabled output. The worker records one metadata-only receipt for a segment it offered to that member and connection. Repeated, stale and unknown receipts have no effect. This is browser-reported evidence. Actual speaker output still requires device verification.
+
+### Gemini meeting audio and replay
+
+This is the current local contract for ordinary meetings. The earlier per-segment voice and decoded-receipt endpoints return 409 in this build.
+
+Every enabled LiveKit group meeting can publish `radio/{target}/{remoteMember}/{sourceTrackSid}` from worker identity `radio-{sourceTrackSid}` inside the recipient's existing private output room. Validate the worker identity, remote member and listening language. The authenticated timeline supplies `radio` and recipient-scoped `radioCaptions` with speaker, source, target, original and translation. These are volatile live drafts. The archive retains separate evidence and revision history.
+
+A `sahva.receiver-mix` browser mark records the first non-silent mixed samples after output is enabled. Either voice can produce the mark. Per-segment translation receipts apply only to individually attributed translated tracks. An interrupted provider session surfaces a warning and plays the original while connected. Rejoin to retry the interpreter.
+
+The timeline includes `replays` for the authenticated listener only. `GET /api/v1/rooms/{id}/replays/{replayId}` serves a private WAV of that listener’s 24 kHz worker mix after successful track writes. Speech is never regenerated for replay or after a transcript correction. Each clip records speaker, recipient, target language, source track, consent epoch and capture time. Live caption excerpts are provisional. Private original recordings and reviewed or provider-final source text retain the existing turn IDs used for report evidence. Replays are bounded to 25 seconds per file and 30 minutes per recipient per meeting.

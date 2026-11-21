@@ -8,6 +8,7 @@ export async function startEngine(
   source: Lang,
   target: Lang,
   hooks: Hooks,
+  conversation = false,
 ) {
   if (!eligible(engine, source, target))
     throw Error("This spoken direction is unsupported");
@@ -36,6 +37,7 @@ export async function startEngine(
       hintSourceLanguage: true,
       echoTargetLanguage: true,
       reportingPeriods: source === "en" && target === "te",
+      conversation,
     });
   return realtime(engine, source, target, hooks);
 }

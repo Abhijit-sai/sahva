@@ -1,3 +1,4 @@
+import { meetingReplays, replayAudio } from "../../../../../lib/server/meeting-archive";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -118,22 +119,29 @@ async function handle(req: NextRequest, context: Params) {
       const captions = snapshot.canRecord ? liveCaptions(id, snapshot.me.listening) : [];
       return json({
         ...snapshot,
-        liveMedia: !!meeting && meeting.interpretedRoom(id),
+        liveMedia: !!meeting && meeting.interpretedRoom(),
+        radio: !!meeting && meeting.radioRoom(),
+        radioCaptions: snapshot.canRecord ? meeting?.radioCaptions(id, participant) : [],
+        connectedMicrophones: snapshot.canRecord ? meeting?.connectedMicrophones(id, snapshot.room.media_epoch) : [],
         captions,
         meetingIssues: meeting?.meetingIssues(id) ?? {},
-        interpretationState: meeting?.interpretationState(id, participant),
+        replays: meeting ? await meetingReplays(id,participant) : [],
         serverTime: serverTime(),
         caption: captions[0] ?? null,
       });
     }
+    if (post && action === "meeting" && parts.length === 3 && parts[2] === "decoded") {
+      throw new Problem(409,"MEETING_AUDIO","Refresh to join the Gemini meeting.");
+    }
+    if (post && action === "meeting" && parts.length === 3 && parts[2] === "voice") {
+      throw new Problem(409,"GEMINI_VOICE","This meeting uses Gemini Live Translate.");
+    }
     if (post && action === "meeting" && parts.length === 2) {
-      const { voice, interpreted, incomingVoice } = z
-        .object({ voice: z.string().max(64).optional(), interpreted: z.boolean().default(false), incomingVoice: z.string().max(64).optional() })
-        .parse(await jsonInput(req));
+      await jsonInput(req);
       return json(
         await (
           await import("../../../../../lib/server/meeting")
-        ).joinMeeting(id, participant, voice, interpreted, incomingVoice),
+        ).joinMeeting(id, participant),
       );
     }
     if (post && action === "turns" && parts.length === 2) {
@@ -170,6 +178,8 @@ async function handle(req: NextRequest, context: Params) {
       return json({ ok: true });
     }
     if (post && action === "end" && parts.length === 2) {
+      const state = await roomState(db.query,id,participant);
+      if (state.me.seat === 1 && state.room.transport === "livekit") await (await import("../../../../../lib/server/meeting")).stopMeeting(id);
       await endRoom(id, participant);
       cancelRoomStream(id);
       if (
@@ -196,6 +206,7 @@ async function handle(req: NextRequest, context: Params) {
     }
     if (parts[2] && !z.uuid().safeParse(parts[2]).success)
       throw new Problem(404, "TURN", "Turn unavailable.");
+    if (!post && action === "replays" && parts.length === 3) return await replayAudio(id,participant,parts[2]);
     if (!post && action === "media" && parts.length === 3)
       return media(
         id,

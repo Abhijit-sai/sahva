@@ -145,3 +145,11 @@ Use QA identifiers below independently of WBS ticket numbers. For every run reco
 | QA-PRES-16 | Recording/retention revoked | Stop egress/composition and purge ephemeral video/audio buffers appropriately |
 | QA-PRES-17 | Translation provider fails | Warning and original/captions-only fallback, not incorrect language with confident status |
 | QA-PRES-18 | Camera or screen track ends unexpectedly | End/switch state, avoid stale-frame freeze without notice |
+
+### CALL-03 radio trial
+
+Run the opt-in radio transport test with the local LiveKit test server on port 17880 and `SAHVA_RADIO_RTC_TEST=1 npm test`. Each mic carries a different source tone and each interpreter direction returns a different target tone. Require at least twenty decoded 20 ms frames above the target-frequency threshold per intended receiver, zero frames above the other target's threshold, exactly one remote speaker publication each and recipient-scoped captions. Mixer tests separately check 10% source gain under voiced interpretation and recovery during silence.
+
+For physical acceptance, record the time from speech end to first audible translated word on the listener's device separately from the first audible original. Repeat with pauses, meaningful assent, negation and overlapping replies across English, Telugu and Hindi. Test both headphones and open speakers. Check that mic mute, consent withdrawal and disconnect end the intended route. A mixed-signal decode mark alone cannot establish translated-word onset or meaning.
+
+For the regular Gemini meeting build, compare saved private WAV data against the PCM frames submitted to each recipient publication. Verify a failed write contributes no audio, note corrections leave the replay unchanged, another participant cannot retrieve it, and a stale consent epoch cannot persist it. Exercise full language tags, including fr → zh-Hant and pt-BR → fil. Transport and configuration checks establish neither physical speaker output nor fluency.

@@ -1,8 +1,135 @@
 import { describe, expect, it, vi } from "vitest";
-import { pcmFrames } from "../lib/server/interpretation-output";
+import {
+  MeetingOutputs,
+  pcmFrames,
+  type SourceSegment,
+} from "../lib/server/interpretation-output";
 import { SarvamSpeech } from "../lib/providers/sarvam";
 
 describe("progressive interpretation", () => {
+  it("keeps committed voices and routes subsequent speech to each listener's chosen voice", async () => {
+    vi.stubEnv("LIVEKIT_API_KEY", "test");
+    vi.stubEnv("LIVEKIT_API_SECRET", "local-test-secret");
+    vi.stubEnv("SARVAM_API_KEY", "test-fixture");
+    const published: string[] = [];
+    const sdk = {
+      Room: class {
+        connect() {}
+        disconnect() {
+          return Promise.resolve();
+        }
+        localParticipant = {
+          publishTrack: ({ name }: { name: string }) => {
+            published.push(name);
+            return { waitForSubscription: () => Promise.resolve() };
+          },
+        };
+      },
+      AudioSource: class {
+        captureFrame() {}
+        waitForPlayout() {}
+      },
+      LocalAudioTrack: {
+        createAudioTrack: (name: string) => ({ name, close() {} }),
+      },
+      TrackPublishOptions: class {},
+      AudioFrame: class {},
+    };
+    // Stand in for native RTC and provider I/O while exercising the real queue and fanout.
+    const outputs = new MeetingOutputs(
+      "room",
+      1,
+      sdk as unknown as typeof import("@livekit/rtc-node"),
+      new Map(),
+    );
+    const send = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).endsWith("/translate")
+          ? Response.json({ translated_text: "fixture", request_id: "offline", source_language_code: "te-IN" })
+          : new Response(new Uint8Array(960), {
+              headers: { "content-type": "audio/pcm" },
+            }),
+      );
+    vi.stubGlobal("fetch", send);
+    try {
+      const token = await outputs.join("a", "en-IN");
+      await outputs.join("b", "en-IN");
+      const room: string = JSON.parse(
+        Buffer.from(token.split(".")[1], "base64url").toString(),
+      ).video.room;
+      const source: SourceSegment = {
+        roomId: "room",
+        epoch: 1,
+        speaker: "speaker",
+        trackSid: "mic",
+        clockEpoch: "clock",
+        startSample: 0,
+        segmentId: "first",
+        sourceRevision: 0,
+        language: "te-IN",
+        samples: 320,
+        text: "fixture",
+        original: Buffer.alloc(640),
+      };
+      const signal = new AbortController().signal;
+      outputs.dispatch(source, signal);
+      expect(outputs.changeVoice("b", room, "dev_en_conversational")).toBe(
+        false,
+      );
+      expect(outputs.changeVoice("a", room, "tarun_te_narration")).toBe(false);
+      expect(outputs.changeVoice("a", room, "dev_en_conversational")).toBe(
+        true,
+      );
+      outputs.dispatch(
+        { ...source, startSample: 320, segmentId: "second" },
+        signal,
+      );
+      await vi.waitFor(() =>
+        expect(
+          send.mock.calls.filter(([url]) => String(url).endsWith("/stream")),
+        ).toHaveLength(3),
+      );
+      const speakers = send.mock.calls
+        .filter(([url]) => String(url).endsWith("/stream"))
+        .map(([, init]) => JSON.parse(String(init?.body)).speaker);
+      expect(speakers.sort()).toEqual([
+        "dev_en_conversational",
+        "simran_en_customer",
+        "simran_en_customer",
+      ]);
+      expect(
+        published
+          .filter((name) => name.includes("/first/"))
+          .map((name) => name.split("/").pop()),
+      ).toEqual(["simran_en_customer", "simran_en_customer"]);
+      expect(
+        published
+          .filter((name) => name.includes("/second/"))
+          .map((name) => name.split("/").pop())
+          .sort(),
+      ).toEqual(["dev_en_conversational", "simran_en_customer"]);
+      const logged = vi.spyOn(console, "info");
+      try {
+        outputs.decoded("b", room, "first");
+        outputs.decoded("a", room, "unknown");
+        outputs.decoded("a", room, "first");
+        outputs.decoded("a", room, "first");
+        expect(logged).toHaveBeenCalledTimes(1);
+        expect(logged).toHaveBeenCalledWith("sahva.media", expect.objectContaining({event:"receiver_decoded", member:"a", segment:"first"}));
+      } finally {
+        logged.mockRestore();
+      }
+      await outputs.join("a", "en-IN");
+      expect(outputs.changeVoice("a", room, "dev_en_conversational")).toBe(
+        false,
+      );
+    } finally {
+      outputs.close();
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+  });
   it("yields before EOF, preserves split samples and pads only the final frame", async () => {
     let input!: ReadableStreamDefaultController<Uint8Array>;
     const body = new ReadableStream<Uint8Array>({
@@ -71,19 +198,17 @@ describe("progressive interpretation", () => {
 });
 
 describe("server rollout", () => {
-  it("keeps the fallback by default and honors an optional room restriction", async () => {
-    const { interpretedRoom } = await import(
-      "../lib/server/interpretation-flag"
-    );
+  it("uses the Gemini meeting route for every enabled group room", async () => {
+    const { interpretedRoom } =
+      await import("../lib/server/interpretation-flag");
     try {
-      vi.stubEnv("SAHVA_LIVE_MEDIA_INTERPRETATION", "");
+      vi.stubEnv("SAHVA_LIVEKIT", "");
       vi.stubEnv("SAHVA_LIVE_MEDIA_ROOM_ID", "");
-      expect(interpretedRoom("a")).toBe(false);
-      vi.stubEnv("SAHVA_LIVE_MEDIA_INTERPRETATION", "1");
-      expect(interpretedRoom("a")).toBe(true);
+      expect(interpretedRoom()).toBe(false);
+      vi.stubEnv("SAHVA_LIVEKIT", "1");
+      expect(interpretedRoom()).toBe(true);
       vi.stubEnv("SAHVA_LIVE_MEDIA_ROOM_ID", "b");
-      expect(interpretedRoom("a")).toBe(false);
-      expect(interpretedRoom("b")).toBe(true);
+      expect(interpretedRoom()).toBe(true);
     } finally {
       vi.unstubAllEnvs();
     }

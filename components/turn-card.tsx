@@ -16,6 +16,7 @@ export type TurnView = {
   created_at: string;
   source: Language | null;
   raw_text: string | null;
+  draft_text?: string | null;
   target: Language;
   revision: number;
   stage: "stt" | "translation" | "tts" | "ready";
@@ -127,6 +128,7 @@ export function TurnCard({
           </p>
         )}
       </div>
+      {turn.draft_text && !turn.revision && <p lang={turn.source ?? undefined}><small>Draft source transcript</small><br />{turn.draft_text}</p>}
       <details className="message-original">
         <summary>Original</summary>
         <small>
@@ -159,6 +161,8 @@ export function TurnCard({
         <p>
           {turn.error === "PROVIDER_NOT_CONFIGURED"
             ? "Speech provider is not configured."
+            : turn.error === "LIVE_REPLAY_UNAVAILABLE"
+              ? "No live Gemini interpretation was saved for this earlier turn."
             : turn.error === "NO_SPEECH"
               ? "No speech detected."
               : "Processing failed (" + turn.error + ")."}{" "}
@@ -184,7 +188,7 @@ export function TurnCard({
           Retry {stages[turn.stage].toLowerCase()}
         </button>
       )}
-      {own && active && turn.raw_text && !editing && (
+      {own && active && (turn.raw_text || turn.draft_text) && !editing && (
         <button className="secondary" onClick={() => setEditing(true)}>
           Correct transcript
         </button>
@@ -213,7 +217,7 @@ export function TurnCard({
             Corrected transcript
             <textarea
               name="text"
-              defaultValue={turn.current_text ?? ""}
+              defaultValue={turn.current_text ?? turn.draft_text ?? ""}
               required
               maxLength={1000}
             />

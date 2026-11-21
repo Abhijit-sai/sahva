@@ -4,7 +4,7 @@ import { AccessToken } from "livekit-server-sdk";
 import type * as RTC from "@livekit/rtc-node";
 import { SarvamSpeech } from "../providers/sarvam.ts";
 import type { Language } from "../shared.ts";
-import { voices, supportsVoice } from "../voices.ts";
+import { defaultIncomingVoice, supportsVoice } from "../voices.ts";
 
 export type SourceSegment = {
   roomId: string;
@@ -29,6 +29,7 @@ type Output = {
   pending: number;
   tail: Promise<void>;
   translating: boolean;
+  receipts: Set<string>;
 };
 
 export async function outputCredential(
@@ -120,6 +121,7 @@ export async function openPcmTrack(
   name: string,
   rate: number,
   signal: AbortSignal,
+  publisher = "interpretation",
 ) {
   const rtc = new sdk.Room();
   const source = new sdk.AudioSource(rate, 1, 100);
@@ -135,7 +137,7 @@ export async function openPcmTrack(
   }
   try {
     signal.throwIfAborted();
-    const token = await outputCredential(room, "interpretation", true);
+    const token = await outputCredential(room, publisher, true);
     await rtc.connect(process.env.LIVEKIT_URL!, token, {
       autoSubscribe: false,
       dynacast: false,
@@ -175,16 +177,19 @@ export class MeetingOutputs {
   private readonly epoch: number;
   private readonly sdk: typeof RTC;
   private readonly issues: Map<string, string>;
+  private readonly onListener?: (member: string, target: Language, room: string, stop: AbortSignal) => void;
   constructor(
     roomId: string,
     epoch: number,
     sdk: typeof RTC,
     issues: Map<string, string>,
+    onListener?: (member: string, target: Language, room: string, stop: AbortSignal) => void,
   ) {
     this.roomId = roomId;
     this.epoch = epoch;
     this.sdk = sdk;
     this.issues = issues;
+    this.onListener = onListener;
   }
 
   async join(member: string, target: Language, requestedVoice?: string) {
@@ -202,16 +207,36 @@ export class MeetingOutputs {
       target,
       voice: supportsVoice(target, requestedVoice)
         ? requestedVoice
-        : target === "te-IN"
-          ? "tarun_te_narration"
-          : voices[target][0].id,
+        : defaultIncomingVoice(target),
       pending: 0,
       tail: Promise.resolve(),
       translating: false,
+      receipts: new Set<string>(),
       stop: new AbortController(),
     };
     this.outputs.set(member, out);
+    this.onListener?.(member, target, room, out.stop.signal);
     return outputCredential(room, member, false);
+  }
+  changeVoice(member: string, outputRoom: string, voice: string) {
+    const out = this.outputs.get(member);
+    if (!out || out.room !== outputRoom || !supportsVoice(out.target, voice))
+      return false;
+    out.voice = voice;
+    return true;
+  }
+  decoded(member: string, outputRoom: string, segment: string) {
+    const out = this.outputs.get(member);
+    if (!out || out.room !== outputRoom || !out.receipts.delete(segment))
+      return;
+    console.info("sahva.media", {
+      event: "receiver_decoded",
+      room: this.roomId,
+      epoch: this.epoch,
+      member,
+      segment,
+      target: out.target,
+    });
   }
   leave(member: string) {
     this.outputs.get(member)?.stop.abort();
@@ -268,7 +293,16 @@ export class MeetingOutputs {
       groups.set(key, group);
     }
     const committed = performance.now();
+    console.info("sahva.media", {
+      event: "segment_routed",
+      room: this.roomId,
+      epoch: this.epoch,
+      speaker: segment.speaker,
+      segment: segment.segmentId,
+      listeners: Array.from(groups.values()).flat().length,
+    });
     for (const group of groups.values()) {
+      const voice = group[0].voice;
       const next = Promise.all(group.map((out) => out.tail))
         .then(async () => {
           const eligible = group.filter((out) => !out.stop.signal.aborted);
@@ -281,7 +315,7 @@ export class MeetingOutputs {
               );
             return;
           }
-          await this.deliver(eligible, segment, trackStop);
+          await this.deliver(eligible, segment, voice, trackStop);
         })
         .finally(() => {
           for (const out of group) out.pending--;
@@ -292,9 +326,10 @@ export class MeetingOutputs {
   private async deliver(
     group: Output[],
     s: SourceSegment,
+    voice: string,
     trackStop: AbortSignal,
   ) {
-    const { target, voice } = group[0];
+    const { target } = group[0];
     const original = target === s.language;
     const rate = original ? 16000 : 24000;
     const name = [
@@ -340,6 +375,17 @@ export class MeetingOutputs {
               AbortSignal.any([signal, out.stop.signal]),
             );
             channels.set(out, channel);
+            if (out.receipts.size >= 16)
+              out.receipts.delete(out.receipts.values().next().value!);
+            out.receipts.add(s.segmentId);
+            console.info("sahva.media", {
+              event: "output_subscribed",
+              room: this.roomId,
+              epoch: this.epoch,
+              member: out.member,
+              segment: s.segmentId,
+              target,
+            });
           } catch {
             failed(out);
           }
@@ -358,6 +404,8 @@ export class MeetingOutputs {
       } else {
         for (const out of channels.keys()) out.translating = true;
         const speech = new SarvamSpeech(process.env.SARVAM_API_KEY!);
+        if (!(s.language === "te-IN" || s.language === "en-IN" || s.language === "hi-IN") ||
+            !(target === "te-IN" || target === "en-IN" || target === "hi-IN")) throw Error("Unsupported legacy speech language");
         const translation = await speech.translate(
           s.text,
           s.language,

@@ -1,6 +1,8 @@
+import { meetingLanguageNames, type MeetingLanguage } from "./meeting-languages.ts";
 export const roomLanguages = ["en-IN", "te-IN", "hi-IN"] as const;
-export type Language = (typeof roomLanguages)[number];
+export type Language = MeetingLanguage;
 export const languages = {
+  ...meetingLanguageNames,
   "en-IN": "English",
   "te-IN": "తెలుగు · Telugu",
   "hi-IN": "हिन्दी · Hindi",
@@ -10,8 +12,8 @@ export const disclosure =
   "Sahva stores voice turns and sends audio and text to AI providers for transcription, translation, synthetic speech and meeting summaries. Both participants can replay recordings and read transcripts. AI can make mistakes. Room access lasts 24 hours. Deletion is handled by the demo operator.";
 export const meetingConsent = "2026-11-21-group-v1";
 export const meetingDisclosure =
-  "Everyone who joins this meeting can read its chat and replay earlier messages. LiveKit transports your microphone audio. Sahva stores the original recording and sends audio and text to AI providers for captions, translation, synthetic speech and meeting notes. Room access lasts 24 hours. The demo operator handles deletion.";
-export const otherLanguage = (source: Language): Language =>
+  "Participants can read the meeting history and replay original recordings. Each participant can replay their own incoming interpretation. LiveKit transports your microphone audio. Gemini Live Translate processes microphone audio. Sahva saves original recordings and the audio from your interpretation stream for replay. Meeting notes use the session transcript. Room access lasts 24 hours. The demo operator handles deletion.";
+export const otherLanguage = (source: Language): "en-IN" | "te-IN" =>
   source === "en-IN" ? "te-IN" : "en-IN";
 export type Member = {
   id: string;

@@ -190,4 +190,10 @@ STREAM-01 group demo extension passed the three-person public rehearsal for Engl
 
 CALL-01 and CALL-02 have local Chrome and worker evidence. CALL-03/04 have partial directional and queue evidence. The final provider-backed retest covered one Telugu source and two recipients. Phone output, complete bidirectional and third-participant human conversation, retry/reconnect acoustics, and the presenter gate are open. [Measured results](../qa/S2ST_BENCHMARK.md)
 
+CALL-03 remains partial. Local regression coverage exercises microphone denial with continued receiver decoding on LiveKit, microphone recovery, and failure of the receiver connection with continued microphone publication. The next call proof needs a persistent authorized playout path, overlapping speech, and receiver measurements on both physical devices.
+
 Production rehearsal release 3a2802f enables interpreted audio in ordinary Group meetings by operator authorization. Public invite, two RTC joins, consent shutdown and owner end passed with silent inputs on 22 November. Physical voice acceptance remains open. [Release evidence](../PROJECT_SUMMARY.md)
+
+CALL-03 remains partial after the local radio trial. Two simultaneous source publishers and two recipient connections passed distinct-frequency decoding through the actual meeting worker and loopback LiveKit server with a deterministic interpreter. The next gate requires consented Gemini speech in both directions with first-translated-audible timing, fluent listeners and a third Hindi recipient. No change to the presenter gate.
+
+CALL-03 local implementation now uses Gemini Live Translate for all regular group rooms. Listener-private replay archives the submitted live mix, and Gemini language selections use the supported language table. Check migration 007, server readiness, two physical devices, a third listening language and first-audible meaning before a public rollout. The standalone recorded phrase product retains its previous implementation.

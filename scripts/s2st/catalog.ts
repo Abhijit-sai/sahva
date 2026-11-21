@@ -1,3 +1,5 @@
+import { model as geminiModel } from "../../lib/providers/gemini-interpretation.ts";
+
 export const languages = {
   en: "English",
   te: "Telugu",
@@ -17,7 +19,7 @@ export const candidates = {
   },
   gemini: {
     name: "Gemini Live Translate",
-    model: "gemini-3.5-live-translate-preview",
+    model: geminiModel,
     sources: ["te", "en", "hi", "es"],
     targets: ["te", "en", "hi", "es"],
     mode: "direct",

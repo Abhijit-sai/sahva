@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useReducer, useState } from "react";
 import { LiveConversation, type Caption } from "./live-conversation";
+import { MeetingCaptions, type RadioCaption } from "./meeting-captions";
 import { InterpretedMeeting } from "./interpreted-meeting";
 import { Entry } from "./entry";
 import { Report } from "./report";
@@ -32,16 +33,34 @@ type Snapshot = {
   meetingIssues: Record<string, string>;
   serverTime: number;
   liveMedia?: boolean;
+  radio?: boolean;
+  replays?: {
+    id: string;
+    speaker_id: string;
+    target: Member["listening"];
+    started_at: string;
+    duration_ms: number;
+    caption: string | null;
+  }[];
+  radioCaptions?: RadioCaption[];
+  connectedMicrophones?: string[];
   interpretationState?: "Translating" | "Catching up";
 };
-export function Workspace({ id }: { id: string }) {
+export function Workspace({
+  id,
+  liveVoiceAvailable,
+  radio,
+}: {
+  id: string;
+  liveVoiceAvailable: boolean;
+  radio?: boolean;
+}) {
   const [invite, setInvite] = useState(""),
     [share, setShare] = useState("");
   const [state, setState] = useState<Snapshot | null>(null),
     [connection, setConnection] = useState(""),
     [error, setError] = useState("");
   const [now, setNow] = useState(0);
-  const [archiveAudio, setArchiveAudio] = useState(false);
   const [clock, setClock] = useState<ClockSample | null>(null);
   const [observations, setObservations] = useState<ListenerObservations>(
     () => ({
@@ -142,6 +161,8 @@ export function Workspace({ id }: { id: string }) {
       <Entry
         id={id}
         invite={invite}
+        liveVoiceAvailable={liveVoiceAvailable}
+        radio={radio}
         meeting={new URLSearchParams(location.search).has("meeting")}
       />
     );
@@ -161,6 +182,37 @@ export function Workspace({ id }: { id: string }) {
       c.text &&
       !state.turns.some((t) => t.phrase_id === c.key),
   );
+  const interpreted = meeting && !!state.liveMedia;
+  const captionCards = drafts.map((caption) => (
+    <div
+      className={
+        "chat-message live-caption " +
+        (caption.speaker === state.me.id ? "own" : "incoming")
+      }
+      key={caption.key}
+      data-has-speech="true"
+      role="status"
+    >
+      <small>
+        {state.members.find((m) => m.id === caption.speaker)?.name} · Live
+        caption
+      </small>
+      {caption.speaker === state.me.id ||
+      state.me.listening ===
+        state.members.find((m) => m.id === caption.speaker)?.speaking ? (
+        <p>{caption.text}</p>
+      ) : (
+        <>
+          <p lang={caption.target}>{caption.translated || "Translating…"}</p>
+          {caption.translated && <small>Draft translation</small>}
+          <details>
+            <summary>Original</summary>
+            <p>{caption.text}</p>
+          </details>
+        </>
+      )}
+    </div>
+  ));
   return (
     <main className="call-workspace">
       <p className="eyebrow">
@@ -177,30 +229,101 @@ export function Workspace({ id }: { id: string }) {
         min
       </p>
       <h1>{state.room.title}</h1>
-      <div className="split call-layout">
+      {interpreted &&
+        active &&
+        (state.canRecord && !connection ? (
+          <InterpretedMeeting
+            key={state.room.media_epoch}
+            id={id}
+            me={state.me}
+            members={state.members}
+            processing={state.interpretationState}
+            radio={state.radio}
+            issue={state.meetingIssues?.[state.me.id]}
+            onDecoded={(segment, at) => {
+              if (clock)
+                observePlayback(segment, {
+                  started: Math.round(at + clock.offset),
+                  uncertainty: clock.uncertainty + 40,
+                  decoded: true,
+                });
+            }}
+          />
+        ) : (
+          <section
+            className="audio-console waiting-console"
+            aria-label="Interpreted meeting audio"
+          >
+            <h2>Meeting audio</h2>
+            <p role="status">
+              {connection
+                ? "Checking the room connection…"
+                : state.members.length < 2
+                  ? "Invite someone to start the call."
+                  : "Waiting for everyone’s consent to enable audio."}
+            </p>
+          </section>
+        ))}
+      <div
+        className={
+          "split call-layout" + (interpreted ? " interpreted-layout" : "")
+        }
+      >
         <section className="room-panel">
-          <h2>Participants</h2>
-          {state.members.map((m) => (
-            <div className="member" key={m.id}>
-              <span aria-hidden="true" className="avatar">
-                {Array.from(m.name)[0]}
-              </span>
-              <strong>
-                {m.name}
-                {m.id === state.me.id ? " (you)" : ""}
-              </strong>
-              <small>
-                {meeting ? "Listens in " : ""}
-                {languages[m.listening]} ·{" "}
-                {m.consented_at ? "Consented" : "Consent withdrawn"} ·{" "}
-                {m.recording
-                  ? "Recording"
-                  : now - Date.parse(m.last_seen) < 20000
-                    ? "Present"
-                    : "Away"}
-              </small>
+          <h2>
+            Participants
+            {interpreted && (
+              <span className="seat-count">{state.members.length}</span>
+            )}
+          </h2>
+          <div className={interpreted ? "participant-tiles" : undefined}>
+            {state.members.map((m) => (
+              <div className="member" key={m.id}>
+                <span aria-hidden="true" className="avatar">
+                  {Array.from(m.name)[0]}
+                </span>
+                <strong>
+                  {m.name}
+                  {m.id === state.me.id ? " (you)" : ""}
+                </strong>
+                <small>
+                  {meeting ? "Listens in " : ""}
+                  {languages[m.listening]} ·{" "}
+                  {m.consented_at ? "Consented" : "Consent withdrawn"} ·{" "}
+                  {m.recording
+                    ? "Recording"
+                    : now - Date.parse(m.last_seen) < 20000
+                      ? "Present"
+                      : "Away"}
+                </small>
+                {interpreted && active && state.canRecord && (
+                  <small className="mic-status">
+                    {connection
+                      ? "Checking microphone..."
+                      : state.connectedMicrophones?.includes(m.id)
+                        ? "Microphone connected"
+                        : "Microphone not connected"}
+                  </small>
+                )}
+              </div>
+            ))}
+          </div>
+          {interpreted && active && (
+            <div className="transcript-panel">
+              <h3>Live transcript</h3>
+              {state.canRecord ? (
+                <MeetingCaptions
+                  members={state.members}
+                  me={state.me}
+                  drafts={drafts}
+                  radio={!!state.radio}
+                  radioCaptions={state.radioCaptions}
+                />
+              ) : (
+                <p>Waiting for participants and consent.</p>
+              )}
             </div>
-          ))}
+          )}
           {share && state.members.length < (meeting ? 6 : 2) && active && (
             <label>
               Invite a participant
@@ -214,23 +337,7 @@ export function Workspace({ id }: { id: string }) {
           )}
           {state.canRecord && !connection ? (
             <>
-              {meeting && state.liveMedia && !archiveAudio ? (
-                <InterpretedMeeting
-                  key={state.room.media_epoch}
-                  id={id}
-                  me={state.me}
-                  members={state.members}
-                  processing={state.interpretationState}
-                  onDecoded={(segment, at) => {
-                    if (clock)
-                      observePlayback(segment, {
-                        started: Math.round(at + clock.offset),
-                        uncertainty: clock.uncertainty + 40,
-                        decoded: true,
-                      });
-                  }}
-                />
-              ) : (
+              {!interpreted && (
                 <LiveConversation
                   key={state.room.media_epoch}
                   room={id}
@@ -247,31 +354,19 @@ export function Workspace({ id }: { id: string }) {
                   onPlayback={observePlayback}
                 />
               )}
-              {meeting && state.liveMedia && (
-                <details>
-                  <summary>Audio delivery</summary>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={archiveAudio}
-                      onChange={(e) => setArchiveAudio(e.target.checked)}
-                    />
-                    Use archived phrase playback
-                  </label>
-                  <p>Rejoin meeting audio after switching.</p>
-                </details>
-              )}
             </>
           ) : (
-            <p>
-              {connection
-                ? "Recording paused while reconnecting."
-                : active
-                  ? meeting
-                    ? "Meeting audio needs at least two members and everyone’s consent."
-                    : "Recording requires two consenting participants."
-                  : "This room has ended."}
-            </p>
+            (!interpreted || !active) && (
+              <p>
+                {connection
+                  ? "Recording paused while reconnecting."
+                  : active
+                    ? meeting
+                      ? "Meeting audio needs at least two members and everyone’s consent."
+                      : "Recording requires two consenting participants."
+                    : "This room has ended."}
+              </p>
+            )
           )}
           {active && (
             <button
@@ -320,16 +415,54 @@ export function Workspace({ id }: { id: string }) {
               }
             />
           )}
-          <h2>Conversation</h2>
-          {state.meetingIssues?.[state.me.id] && (
-            <p role="alert">{state.meetingIssues[state.me.id]}</p>
-          )}
-          {!state.turns.length && !state.caption?.text && (
-            <p className="empty-chat">
-              {active
-                ? "Voice messages and captions appear here as you speak."
-                : "No voice messages."}
-            </p>
+          <h2>{interpreted ? "Conversation history" : "Conversation"}</h2>
+          {(!interpreted || !state.canRecord || !active || connection) &&
+            state.meetingIssues?.[state.me.id] && (
+              <p role="alert">{state.meetingIssues[state.me.id]}</p>
+            )}
+          {!state.replays?.length &&
+            !state.turns.length &&
+            (interpreted || !state.caption?.text) && (
+              <p className="empty-chat">
+                {active
+                  ? interpreted
+                    ? "Original recordings and translated replays appear here after each turn."
+                    : "Voice messages and captions appear here as you speak."
+                  : "No voice messages."}
+              </p>
+            )}
+          {!!state.replays?.length && (
+            <div aria-label="Your interpreted replays">
+              <h3>Your interpreted replays</h3>
+              {state.replays.map((clip) => (
+                <article key={clip.id} className="chat-message">
+                  <strong>
+                    {state.members.find((m) => m.id === clip.speaker_id)
+                      ?.name ?? "Participant"}
+                  </strong>
+                  <small>
+                    {" "}
+                    · {languages[clip.target]} ·{" "}
+                    {new Date(clip.started_at).toLocaleTimeString()}
+                  </small>
+                  {clip.caption && (
+                    <p lang={clip.target}>
+                      <small>Live caption excerpt</small>
+                      <br />
+                      {clip.caption}
+                    </p>
+                  )}
+                  <audio
+                    preload="none"
+                    controls
+                    aria-label={
+                      "Replay incoming audio in " + languages[clip.target]
+                    }
+                    src={"/api/v1/rooms/" + id + "/replays/" + clip.id}
+                  />
+                </article>
+              ))}
+            </div>
           )}
           {state.turns.map((t) => (
             <TurnCard
@@ -342,6 +475,7 @@ export function Workspace({ id }: { id: string }) {
               }
               own={state.me.id === t.speaker_id}
               playing={
+                !interpreted &&
                 !!observations.playback.get(t.id) &&
                 !observations.playback.get(t.id)?.ended &&
                 state.canRecord &&
@@ -349,44 +483,12 @@ export function Workspace({ id }: { id: string }) {
               }
               active={
                 state.members.every((m) => m.consented_at) &&
-                (active || t.revision > 0 || !!t.raw_text)
+                (active || t.revision > 0 || !!t.raw_text || !!t.draft_text)
               }
               onUpdate={refresh}
             />
           ))}
-          {drafts.map((caption) => (
-            <div
-              className={
-                "chat-message live-caption " +
-                (caption.speaker === state.me.id ? "own" : "incoming")
-              }
-              key={caption.key}
-              data-has-speech="true"
-              role="status"
-            >
-              <small>
-                {state.members.find((m) => m.id === caption.speaker)?.name} ·
-                Live caption
-              </small>
-              {caption.speaker === state.me.id ||
-              state.me.listening ===
-                state.members.find((m) => m.id === caption.speaker)
-                  ?.speaking ? (
-                <p>{caption.text}</p>
-              ) : (
-                <>
-                  <p lang={caption.target}>
-                    {caption.translated || "Translating…"}
-                  </p>
-                  {caption.translated && <small>Draft translation</small>}
-                  <details>
-                    <summary>Original</summary>
-                    <p>{caption.text}</p>
-                  </details>
-                </>
-              )}
-            </div>
-          ))}
+          {!interpreted && captionCards}
         </section>
       </div>
       <Rehearsal

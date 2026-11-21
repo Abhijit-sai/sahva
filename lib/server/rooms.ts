@@ -1,3 +1,4 @@
+import { meetingLanguages } from "../meeting-languages.ts";
 import {
   createHash,
   createHmac,
@@ -10,7 +11,6 @@ import { join } from "node:path";
 import { z } from "zod";
 import { database, dataDir, local, type Query } from "./db.ts";
 import {
-  roomLanguages,
   consentVersion,
   meetingConsent,
   type Member,
@@ -26,7 +26,7 @@ export class Problem extends Error {
     this.code = code;
   }
 }
-const lang = z.enum(roomLanguages);
+const lang = z.enum(meetingLanguages);
 const profile = z.object({
   name: z.string().trim().min(1).max(60),
   listeningLanguage: lang,
@@ -170,12 +170,12 @@ export async function enter(input: unknown, existing?: string) {
     }
     if (
       transport === "phrase" &&
-      (form.listeningLanguage === "hi-IN" || form.speakingLanguage === "hi-IN")
+      (!["en-IN", "te-IN"].includes(form.listeningLanguage) || !["en-IN", "te-IN"].includes(form.speakingLanguage))
     )
       throw new Problem(
         400,
         "LANGUAGE",
-        "Choose a group meeting to use Hindi.",
+        "Recorded phrase calls support English and Telugu.",
       );
     if (
       form.consentVersion !==

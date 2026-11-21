@@ -7,6 +7,7 @@ import { setRecording } from "./recording.ts";
 import { Problem } from "./rooms.ts";
 import { SarvamSpeech } from "../providers/sarvam.ts";
 import { upload } from "./turns.ts";
+import { wave } from "./wave.ts";
 import { otherLanguage, type Language } from "../shared.ts";
 
 import { serverTime, type TurnTiming } from "../rehearsal.ts";
@@ -100,6 +101,7 @@ export async function beginLive(
     transport,
     epoch,
   );
+  if (state.room.transport !== "phrase") throw new Problem(409,"MEETING_AUDIO","Use the meeting microphone.");
   const params = new URLSearchParams({
     model: "saaras:v4",
     language_code: state.me.speaking,
@@ -190,6 +192,7 @@ export async function beginLive(
     );
   }
 }
+function legacyLanguage(code:Language): code is "en-IN" | "te-IN" | "hi-IN" { return code === "en-IN" || code === "te-IN" || code === "hi-IN"; }
 export async function interpretDraft(
   room: string,
   person: string,
@@ -213,6 +216,7 @@ export async function interpretDraft(
     const speech = new SarvamSpeech(process.env.SARVAM_API_KEY!);
     await Promise.allSettled(
       s.targets.map(async (target) => {
+        if (!legacyLanguage(s.language) || !legacyLanguage(target)) return;
         const draft =
           target === s.language
             ? text
@@ -273,22 +277,7 @@ export async function committedMeetingPhrase(room: string, person: string, key: 
   return { text: s.text, language: s.language, original: Buffer.concat(s.chunks), samples: s.bytes / 2 };
 }
 
-function wave(samples: Buffer, rate = 16000) {
-  const h = Buffer.alloc(44);
-  h.write("RIFF");
-  h.writeUInt32LE(samples.length + 36, 4);
-  h.write("WAVEfmt ", 8);
-  h.writeUInt32LE(16, 16);
-  h.writeUInt16LE(1, 20);
-  h.writeUInt16LE(1, 22);
-  h.writeUInt32LE(rate, 24);
-  h.writeUInt32LE(rate * 2, 28);
-  h.writeUInt16LE(2, 32);
-  h.writeUInt16LE(16, 34);
-  h.write("data", 36);
-  h.writeUInt32LE(samples.length, 40);
-  return Buffer.concat([h, samples]);
-}
+
 export async function finishLive(room: string, person: string, input: unknown) {
   const { key, cancel, capture, voice } = z
     .object({
@@ -350,7 +339,7 @@ export async function finishLive(room: string, person: string, input: unknown) {
     room,
     person,
     form,
-    s.final ? { text: s.text, source: s.language } : undefined,
+    s.final && legacyLanguage(s.language) ? { text: s.text, source: s.language } : undefined,
     s.timing,
   )
     .then(async (saved) => {

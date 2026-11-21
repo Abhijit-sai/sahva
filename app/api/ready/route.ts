@@ -6,10 +6,9 @@ export async function GET() {
       process.env.NODE_ENV === "production" &&
       [
         ...(process.env.SAHVA_LIVEKIT === "1"
-          ? ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"]
-          : []),
+          ? ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "GEMINI_API_KEY"]
+          : ["SARVAM_API_KEY"]),
         "DATABASE_URL",
-        "SARVAM_API_KEY",
         "OPENAI_API_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
         "NEXT_PUBLIC_SUPABASE_URL",
@@ -19,7 +18,7 @@ export async function GET() {
       throw new Error("Incomplete runtime configuration");
     const db = await database();
     await db.query(
-      "select r.transport,r.media_epoch from sahva.rooms r, sahva.meeting_records m limit 0",
+      "select r.transport,r.media_epoch from sahva.rooms r, sahva.meeting_records m, sahva.meeting_replays p limit 0",
     );
     return Response.json(
       { ready: true },

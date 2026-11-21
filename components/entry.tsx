@@ -23,6 +23,8 @@ export function Entry({
   invite?: string;
   meeting?: boolean;
   offerMeeting?: boolean;
+  liveVoiceAvailable?: boolean;
+  radio?: boolean;
 }) {
   const hydrated = useSyncExternalStore(
     hydrationSubscription,
@@ -30,9 +32,12 @@ export function Entry({
     () => false,
   );
   const [group, setGroup] = useState(meeting);
+  const [listening, setListening] = useState<Language>("en-IN");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [preferences, setPreferences] = useState<Record<Language, string>>({
+  const [preferences, setPreferences] = useState<
+    Record<keyof typeof voices, string>
+  >({
     "hi-IN": voices["hi-IN"][0].id,
     "en-IN": voices["en-IN"][0].id,
     "te-IN": voices["te-IN"][0].id,
@@ -41,8 +46,7 @@ export function Entry({
     <main className="entry">
       <div className="intro">
         <p className="eyebrow">
-          {group ? "English · తెలుగు · हिन्दी" : "Telugu ↔ English"} · Voice
-          room
+          {group ? "Gemini Live Translate" : "Telugu ↔ English"} · Voice room
         </p>
         <h1>
           {id
@@ -75,13 +79,14 @@ export function Entry({
               transport: group ? "livekit" : "phrase",
               consentVersion: group ? meetingConsent : consentVersion,
             });
-            for (const target of roomLanguages)
-              rememberVoice(
-                room.roomId,
-                room.participantId,
-                target,
-                preferences[target],
-              );
+            if (!group)
+              for (const target of roomLanguages)
+                rememberVoice(
+                  room.roomId,
+                  room.participantId,
+                  target,
+                  preferences[target],
+                );
             if (group && room.invite)
               sessionStorage.setItem("meeting-" + room.roomId, "1");
             if (room.invite)
@@ -100,10 +105,21 @@ export function Entry({
             <select
               disabled={!hydrated}
               value={group ? "meeting" : "call"}
-              onChange={(e) => setGroup(e.target.value === "meeting")}
+              onChange={(e) => {
+                setGroup(e.target.value === "meeting");
+                if (
+                  e.target.value === "call" &&
+                  !["en-IN", "te-IN"].includes(listening)
+                )
+                  setListening("en-IN");
+              }}
             >
               <option value="call">Recorded phrase call · 2 people</option>
-              <option value="meeting">{meeting ? "Live interpreted call · 2–6 people" : "Group meeting · up to 6 people"}</option>
+              <option value="meeting">
+                {meeting
+                  ? "Live interpreted call · 2–6 people"
+                  : "Group meeting · up to 6 people"}
+              </option>
             </select>
           </label>
         )}
@@ -132,9 +148,21 @@ export function Entry({
             (name, i) => (
               <label key={name}>
                 {i ? "Listen in" : "Speak in"}
-                <select name={name}>
+                <select
+                  name={name}
+                  {...(i
+                    ? {
+                        value: listening,
+                        onChange: (
+                          event: React.ChangeEvent<HTMLSelectElement>,
+                        ) => setListening(event.target.value as Language),
+                      }
+                    : {})}
+                >
                   {Object.entries(languages)
-                    .filter(([code]) => group || code !== "hi-IN")
+                    .filter(
+                      ([code]) => group || code === "en-IN" || code === "te-IN",
+                    )
                     .map(([code, label]) => (
                       <option value={code} key={code}>
                         {label}
@@ -145,26 +173,27 @@ export function Entry({
             ),
           )}
         </div>
-        <details>
-          <summary>Choose my translated voice</summary>
-          {roomLanguages
-            .filter((target) => group || target !== "hi-IN")
-            .map((target) => (
-              <VoicePicker
-                key={target}
-                target={target}
-                value={preferences[target]}
-                onChange={(value) =>
-                  setPreferences((prev) => ({ ...prev, [target]: value }))
-                }
-              />
-            ))}
-        </details>
-        {group && (
+        {group ? (
           <p>
-            Meetings with Hindi use Sreekar for Telugu speech. When Sreekar is
-            unavailable, Tarun reads the Telugu translation.
+            Gemini interprets live in your listening language. You hear the
+            speaker’s original audio underneath.
           </p>
+        ) : (
+          <details>
+            <summary>Choose my translated voice</summary>
+            {roomLanguages
+              .filter((target) => group || target !== "hi-IN")
+              .map((target) => (
+                <VoicePicker
+                  key={target}
+                  target={target}
+                  value={preferences[target]}
+                  onChange={(value) =>
+                    setPreferences((prev) => ({ ...prev, [target]: value }))
+                  }
+                />
+              ))}
+          </details>
         )}
         <p className="notice">{group ? meetingDisclosure : disclosure}</p>
         <label className="check">

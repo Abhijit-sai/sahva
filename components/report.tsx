@@ -57,7 +57,7 @@ export function Report({
   onEvidence: (id: string) => void;
 }) {
   const [language, setLanguage] = useState<keyof typeof labels>(
-      preferred === "hi-IN" ? "en-IN" : preferred,
+      preferred === "te-IN" ? "te-IN" : "en-IN",
     ),
     [view, setView] = useState<View | null>(null),
     [error, setError] = useState("");
