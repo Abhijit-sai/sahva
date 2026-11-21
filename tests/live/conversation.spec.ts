@@ -15,6 +15,7 @@ test("four consented voice notes through two sessions, both speech directions an
   const second = await guest.newPage();
   const headers = { "x-sahva-request": "1" };
   await page.goto("/");
+  if (await page.getByLabel("Room type").count()) await page.getByLabel("Room type").selectOption("call");
   await page.getByLabel("Your name").fill("Speaker A");
   await page.getByLabel("Listen in").selectOption("te-IN");
   await page.getByLabel("Speak in").selectOption("te-IN");

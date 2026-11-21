@@ -140,3 +140,18 @@ test("interpreted output recovers a blocked pre-join speaker without opening a m
     await peer.close();
   }
 });
+
+test("the first choice creates an interpreted room when live media is enabled", async ({page}) => {
+  test.skip(process.env.SAHVA_RTC_TEST !== "1", "requires the interpreted-meeting flag");
+  await page.goto("/");
+  await expect(page.getByLabel("Room type")).toHaveValue("meeting");
+  await page.getByLabel("Your name").fill("Route check");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Agree & create room" }).click();
+  const invite = new URL(await page.getByLabel("Invitation link").inputValue());
+  expect(invite.searchParams.get("meeting")).toBe("1");
+  const id = invite.pathname.split("/").pop();
+  const state = await (await page.request.get("/api/v1/rooms/" + id + "/timeline")).json();
+  expect(state.room.transport).toBe("livekit");
+  expect(state.liveMedia).toBe(true);
+});

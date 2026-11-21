@@ -35,6 +35,7 @@ try {
   seats.push(a, b);
   await b.setViewportSize({ width: 390, height: 844 });
   await a.goto(origin);
+  if (await a.getByLabel("Room type").count()) await a.getByLabel("Room type").selectOption("call");
   await a.getByLabel("Your name").fill("Anu");
   await a.getByLabel("Speak in").selectOption("te-IN");
   await a.getByLabel("Listen in").selectOption("te-IN");

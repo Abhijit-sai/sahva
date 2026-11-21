@@ -29,6 +29,7 @@ jobs:
       - run: npm run test:browser
         env:
           PLAYWRIGHT_CHANNEL: chromium
+          SAHVA_RTC_TEST: "1"
       - run: npm run build
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

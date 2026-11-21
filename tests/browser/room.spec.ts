@@ -4,6 +4,7 @@ test("two consenting seats persist, third seat and unscoped access are refused",
   browser,
 }) => {
   await page.goto("/");
+  if (await page.getByLabel("Room type").count()) await page.getByLabel("Room type").selectOption("call");
   await page.getByLabel("Your name").fill("Test owner");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Agree & create room" }).click();
@@ -56,6 +57,7 @@ test("a recorded browser turn survives STT failure, retry and reload with privat
   browser,
 }) => {
   await page.goto("/");
+  if (await page.getByLabel("Room type").count()) await page.getByLabel("Room type").selectOption("call");
   await page.getByLabel("Your name").fill("Voice owner");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Agree & create room" }).click();

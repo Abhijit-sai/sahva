@@ -102,8 +102,8 @@ export function Entry({
               value={group ? "meeting" : "call"}
               onChange={(e) => setGroup(e.target.value === "meeting")}
             >
-              <option value="call">Two-person call</option>
-              <option value="meeting">Group meeting · up to 6 people</option>
+              <option value="call">Recorded phrase call · 2 people</option>
+              <option value="meeting">{meeting ? "Live interpreted call · 2–6 people" : "Group meeting · up to 6 people"}</option>
             </select>
           </label>
         )}

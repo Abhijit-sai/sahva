@@ -9,7 +9,7 @@
 
 ## Group meetings
 
-A server with LiveKit enabled offers **Group meeting** under **Room type**. Create the room, share its invitation, and have each guest choose a speaking and listening language. Once two people have joined, select **Join meeting audio** on each device. Up to six people can join. English, Telugu and Hindi listeners see the same speaker’s message in their own language. **Original** opens its source recording and transcript. The roster stays beside the conversation on desktop.
+With live interpretation enabled for all rooms, the homepage preselects **Live interpreted call · 2–6 people**. Choose **Recorded phrase call · 2 people** for the older file-playback mode. Create the room, share its invitation, and have each guest choose a speaking and listening language. Once two people have joined, select **Join meeting audio** on each device. Up to six people can join. English, Telugu and Hindi listeners see the same speaker’s message in their own language. **Original** opens its source recording and transcript. The roster stays beside the conversation on desktop.
 
 The interpreter transcribes each participant’s microphone separately. Captions update during speech. Automatic playback uses archived audio or generated speech after a phrase becomes stable. Withdrawing consent stops interpretation for the room. Participants can consent again and reconnect their microphones. [Meeting setup and test](ops/LOCAL_DEVELOPMENT.md#livekit-group-meetings)
 
@@ -93,4 +93,4 @@ Sahva’s public meetings use LiveKit and Sarvam. The local Translation Lab is t
 
 ## Interpreted group audio
 
-When live media interpretation is enabled, create a **Group meeting**, share its invitation and select **Join meeting audio** once on each device. Use **Enable meeting audio** if the browser suspends playback. Each listener receives committed remote speech on a private LiveKit audio track in their listening language. The conversation timeline retains captions and optional original/translated replay. **Audio delivery** offers the archived phrase fallback. Rehearsal timings show receiver-side decoded voice and clock uncertainty. [Test evidence](qa/S2ST_BENCHMARK.md)
+When live media interpretation is enabled, create a **Live interpreted call**, share its invitation and select **Join meeting audio** once on each device. Use **Enable meeting audio** if the browser suspends playback. Each listener receives committed remote speech on a private LiveKit audio track in their listening language. The conversation timeline retains captions and optional original/translated replay. **Audio delivery** offers the archived phrase fallback. Rehearsal timings show receiver-side decoded voice and clock uncertainty. [Test evidence](qa/S2ST_BENCHMARK.md)
