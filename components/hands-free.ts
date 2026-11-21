@@ -18,19 +18,26 @@ export function speechEnergy(frame: ArrayBuffer) {
 export async function armHandsFree(
   signal: AbortSignal,
   blocked: () => boolean,
-  begin: (input: PhraseInput) => Promise<void>,
+  begin: (
+    input: PhraseInput,
+    activity: { onset: number; lastVoiced: number },
+  ) => Promise<void>,
   onLost: () => void,
 ) {
   let history: ArrayBuffer[] = [];
   let opening: ArrayBuffer[] | null = null;
   let deliver: FrameConsumer | null = null;
   let occupied = false;
+  let activity: { onset: number; lastVoiced: number } | undefined;
   let quietAfterTurn = 0,
     floor = 0.002;
   await listenPcm(
     signal,
     (frame) => {
       if (signal.aborted) return;
+      const energy = speechEnergy(frame);
+      const voiced = energy > Math.max(0.009, floor * 3.5);
+      if (activity && voiced) activity.lastVoiced = performance.now();
       if (deliver) {
         deliver(frame);
         return;
@@ -46,8 +53,6 @@ export async function armHandsFree(
         quietAfterTurn = 1;
         return;
       }
-      const energy = speechEnergy(frame);
-      const voiced = energy > Math.max(0.009, floor * 3.5);
       if (!voiced) floor = 0.95 * floor + 0.05 * Math.min(energy, 0.02);
       if (quietAfterTurn > 0) {
         history = [];
@@ -73,7 +78,10 @@ export async function armHandsFree(
           deliver = null;
         };
       };
-      void begin(input).finally(() => {
+      const onset = performance.now();
+      activity = { onset, lastVoiced: onset };
+      void begin(input, activity).finally(() => {
+        activity = undefined;
         deliver = null;
         opening = null;
         occupied = false;

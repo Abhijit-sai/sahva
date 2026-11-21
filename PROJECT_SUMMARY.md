@@ -310,3 +310,32 @@ Two consenting participants can activate the interpreter once, alternate Telugu 
 - **Rehearsal result.** Following the phone-and-laptop setup, the user tried hands-free and encountered issues. The affected device, browser, audio setup, symptoms and steps to reproduce are unknown. The user did not report whether both translation directions and the end-room summary completed. Physical-device acceptance remains open.
 - **Decision.** The user deferred troubleshooting. When LIVE-03 resumes, record one concrete example with the speaking device, language direction, expected result and observed result. Follow that phrase from microphone pickup through captions to remote playback, then repeat in the opposite direction. Earlier automated checks and their timings remain in the LIVE-02 entry.
 - **Handoff.** VOICE-01 remains planned: optional speaker-selected voice and delivery preferences, followed by bilingual listening tests for tone and emphasis. Public AWS deployment and hosted latency measurements are still pending. This session updated only `PROJECT_SUMMARY.md`. No application tests or provider calls were run for this documentation change.
+
+---
+## [2026-11-21 14:39 IST] — Release planning and repository reconstruction — VERIFIED
+
+**Reporter** Codex · **Checkout** sahva_project_pack / main / 8250dda702077bb07e4723589a0ec2b90ddae2c9 · **Upstream** origin/main · **Ticket** LIVE-03 · **Deadline** unknown.
+
+The initial index, worktree and untracked status were clean. Inspected source, migrations 001–004, tests, release workflow, environment names, deployment runbook, Git history and the private backup file listing. The four-turn provider success and timings are prior LIVE-02 evidence. The latest firsthand device feedback records an issue without details. Public AWS acceptance is outstanding. The temporary phone gateway was a rehearsal route.
+
+Updated PRD, acceptance, architecture, provider evaluation, data/API contracts, WBS, QA and risks. Reviewed current vendor documentation and separated per-direction language support and pricing. Retain ADR-0004 and the manual fallback. Future cross-speaker concurrency requires independent generation, queue and stable segment boundaries before any default changes. No code, migrations, provider calls or deployment in this planning step. Start LIVE-03 with timing diagnostics, then rehearse with two real devices.
+
+---
+## [2026-11-21 14:44 IST] — LIVE-03 — Timing instrumentation and clarified device feedback — PARTIAL
+
+**Checkout** sahva_project_pack / main / 8250dda, tracking origin/main. Changes are unstaged. **Reporter** Codex. **Deadline** unknown.
+
+Added numeric capture, relay, translation, generation and listener playback observations to the existing room, with clock-offset estimates, missing-sample handling and direction-specific distributions. Existing turn timings JSON accommodates older rows without migration. Typecheck, ESLint and 12 unit tests passed. A fresh four-phrase synthetic Chrome run using real providers on port 3018 passed both report views, attribution, interruption, echo simulation and media release. Samples per direction were two. Telugu → English last voiced frame to scheduled playback median/p95/worst was 4256/4535/4535 ms. English → Telugu was 4642/4839/4839 ms. First displayed caption medians were 1763 and 1226 ms respectively. Neither English → Telugu playback ran to completion because the test interrupted both.
+
+The human speaker confirmed the laptop spoke and translation was acceptable. The problem was how the listener associated audio, captions and originals with a particular message. The exact language direction and acoustic results are still unknown. Prioritize this call-interface correction in LIVE-03. The AWS console independently shows a running dedicated sahva-demo x86-64 Amazon Linux 2023 host in Oregon. No deployment has occurred and the Oregon database template has no values. Verify the SSH identity, HTTPS address and target database before release.
+
+---
+## [2026-11-21 14:57 IST] — LIVE-03 and SB-07-AWS — Call messages verified locally, host prepared — PARTIAL
+
+**Reporter** Codex · **Checkout** sahva_project_pack / main / 8250dda, origin/main verified on the remote. **Deadline** unknown. This entry accompanies the release candidate.
+
+The participant list and call controls stay beside the chat on desktop. A phone-sized layout shows participants and messages together. Join audio call activates hands-free capture and translated playback. A remote message defaults to its translated recording and caption. Original reveals both source recording and raw transcript, including a separate speaker correction when present. Own messages prioritize their source. Playback retry preserves pending turns. Playing archived audio interrupts automatic output. Single-phrase input and recording remain under Audio options. Updated workspace, live controls, turn cards, CSS, README and browser scripts.
+
+Fresh real-provider four-turn test on localhost verified the exact translated caption, playback source, Original disclosure and text for every message. Both reports passed. On two samples each, last voiced frame to scheduled playback median/p95/worst was 3950/3951/3951 ms Telugu → English and 4854/5052/5052 ms English → Telugu. Visible translated-caption medians were 2069 and 1834 ms. Approximate combined clock uncertainty is shown per message. An earlier run timed out at third-turn playback while the development build was changing. The separate live phrase fallback passed in both directions. Three offline browser regressions passed in 21 s. Typecheck, lint, 12 unit tests and isolated production build passed. Sandboxed loopback and Windows junction creation required rerunning browser/build checks with permissions. Human follow-up remains pending.
+
+Verified dedicated Oregon instance against the EC2 boot-log SSH fingerprint. Docker and Git installed. The operator approved the existing Tokyo settings for this host. Only the six required settings and public origin were installed in a root-owned 0600 runtime file. Git and Docker ignore PEM files. The published 0c017ba baseline passed archive checksum, private bucket and migration checks, and returned ready on loopback. No new instance or database was created. Next: publish and verify the new release, finish HTTPS for sahva.madsoul.in, then run the remote synthetic and physical calls.

@@ -5,6 +5,12 @@ import { LiveConversation, type Caption } from "./live-conversation";
 import { Entry } from "./entry";
 import { Report } from "./report";
 import { TurnCard, type TurnView } from "./turn-card";
+import {
+  Rehearsal,
+  type ListenerObservations,
+  type PlaybackObservation,
+} from "./rehearsal";
+import { alignClock, type ClockSample } from "../lib/rehearsal";
 import { api } from "./client";
 import {
   consentVersion,
@@ -20,6 +26,7 @@ type Snapshot = {
   canRecord: boolean;
   turns: TurnView[];
   caption: Caption | null;
+  serverTime: number;
 };
 export function Workspace({ id }: { id: string }) {
   const [invite, setInvite] = useState(""),
@@ -27,8 +34,21 @@ export function Workspace({ id }: { id: string }) {
   const [state, setState] = useState<Snapshot | null>(null),
     [connection, setConnection] = useState(""),
     [error, setError] = useState("");
-  const [now, setNow] = useState(0),
-    [tab, setTab] = useState("room");
+  const [now, setNow] = useState(0);
+  const [clock, setClock] = useState<ClockSample | null>(null);
+  const [observations, setObservations] = useState<ListenerObservations>(
+    () => ({
+      ready: new Map(),
+      caption: new Map(),
+      playback: new Map(),
+    }),
+  );
+  function observePlayback(id: string, event: PlaybackObservation) {
+    setObservations((previous) => ({
+      ...previous,
+      playback: new Map(previous.playback).set(id, event),
+    }));
+  }
   const [tick, refresh] = useReducer((n) => n + 1, 0);
   useEffect(() => {
     let live = true;
@@ -36,8 +56,33 @@ export function Workspace({ id }: { id: string }) {
     let processing = false;
     async function poll() {
       try {
+        const sent = performance.now();
         const snapshot = await api<Snapshot>("/" + id + "/timeline");
         if (!live) return;
+        const received = performance.now();
+        const sample = alignClock(sent, received, snapshot.serverTime);
+        const observed = Math.round(received + sample.offset);
+        setClock(sample);
+        setObservations((previous) => {
+          const ready = new Map(previous.ready);
+          const caption = new Map(previous.caption);
+          for (const turn of snapshot.turns)
+            if (turn.stage === "ready" && !ready.has(turn.id))
+              ready.set(turn.id, observed);
+          const interim = snapshot.caption?.interimAt;
+          const liveCaption = snapshot.caption;
+          if (interim !== undefined && liveCaption && !caption.has(interim)) {
+            const speaker = snapshot.members.find(
+              (member) => member.id === liveCaption.speaker,
+            );
+            if (
+              liveCaption.translated ||
+              speaker?.speaking === liveCaption.target
+            )
+              caption.set(interim, observed);
+          }
+          return { ...previous, ready, caption };
+        });
         setState(snapshot);
         setNow(Date.now());
         setConnection("");
@@ -88,9 +133,9 @@ export function Workspace({ id }: { id: string }) {
     );
   const active = state.room.status === "active";
   return (
-    <main>
+    <main className="call-workspace">
       <p className="eyebrow">
-        Interpreter room · {active ? "Active" : "Ended"} ·{" "}
+        Audio call · {active ? "Live" : "Ended"} ·{" "}
         {Math.max(
           0,
           Math.floor(
@@ -102,18 +147,14 @@ export function Workspace({ id }: { id: string }) {
         min
       </p>
       <h1>{state.room.title}</h1>
-      <nav className="tabs" aria-label="Room panels">
-        {["room", "conversation"].map((t) => (
-          <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>
-            {t === "room" ? "Room" : "Conversation"}
-          </button>
-        ))}
-      </nav>
-      <div className="split" data-tab={tab}>
+      <div className="split call-layout">
         <section className="room-panel">
-          <h2>Room</h2>
+          <h2>Participants</h2>
           {state.members.map((m) => (
             <div className="member" key={m.id}>
+              <span aria-hidden="true" className="avatar">
+                {Array.from(m.name)[0]}
+              </span>
               <strong>
                 {m.name}
                 {m.id === state.me.id ? " (you)" : ""}
@@ -149,6 +190,8 @@ export function Workspace({ id }: { id: string }) {
                 caption={state.caption}
                 turns={state.turns}
                 refresh={refresh}
+                clock={clock}
+                onPlayback={observePlayback}
               />
             </>
           ) : (
@@ -184,14 +227,13 @@ export function Workspace({ id }: { id: string }) {
               onClick={async () => {
                 try {
                   await api("/" + id + "/end", {});
-                  setTab("conversation");
                   refresh();
                 } catch (e) {
                   setError((e as Error).message);
                 }
               }}
             >
-              End room
+              End call
             </button>
           )}
         </section>
@@ -208,8 +250,14 @@ export function Workspace({ id }: { id: string }) {
               }
             />
           )}
-          <h2>Conversation timeline</h2>
-          {!state.turns.length && <p>No turns yet.</p>}
+          <h2>Conversation</h2>
+          {!state.turns.length && !state.caption?.text && (
+            <p className="empty-chat">
+              {active
+                ? "Voice messages and captions appear here as you speak."
+                : "No voice messages."}
+            </p>
+          )}
           {state.turns.map((t) => (
             <TurnCard
               key={t.id}
@@ -220,6 +268,12 @@ export function Workspace({ id }: { id: string }) {
                 "Participant"
               }
               own={state.me.id === t.speaker_id}
+              playing={
+                !!observations.playback.get(t.id) &&
+                !observations.playback.get(t.id)?.ended &&
+                state.canRecord &&
+                !connection
+              }
               active={
                 state.members.every((m) => m.consented_at) &&
                 (active || t.revision > 0 || !!t.raw_text)
@@ -227,8 +281,47 @@ export function Workspace({ id }: { id: string }) {
               onUpdate={refresh}
             />
           ))}
+          {state.canRecord && state.caption?.text && (
+            <div
+              className={
+                "chat-message live-caption " +
+                (state.caption.speaker === state.me.id ? "own" : "incoming")
+              }
+              data-has-speech="true"
+              role="status"
+            >
+              <small>
+                {
+                  state.members.find((m) => m.id === state.caption?.speaker)
+                    ?.name
+                }{" "}
+                · Live caption
+              </small>
+              {state.caption.speaker === state.me.id ||
+              state.caption.target ===
+                state.members.find((m) => m.id === state.caption?.speaker)
+                  ?.speaking ? (
+                <p>{state.caption.text}</p>
+              ) : (
+                <>
+                  <p lang={state.caption.target}>
+                    {state.caption.translated || "Translating…"}
+                  </p>
+                  {state.caption.translated && <small>Draft translation</small>}
+                  <details>
+                    <summary>Original</summary>
+                    <p>{state.caption.text}</p>
+                  </details>
+                </>
+              )}
+            </div>
+          )}
         </section>
       </div>
+      <Rehearsal
+        turns={state.turns.filter((turn) => turn.speaker_id !== state.me.id)}
+        observations={observations}
+      />
       {(connection || error) && <p role="alert">{connection || error}</p>}
     </main>
   );

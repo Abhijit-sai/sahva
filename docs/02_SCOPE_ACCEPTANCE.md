@@ -1,5 +1,9 @@
 # Scope, Acceptance Criteria and Release Gates
 
+## Current release gates
+
+The dependency-ordered release tickets are in [the WBS](08_WBS_AND_PHASE_PLAN.md). The original timeboxed scope below describes the foundation. Accept the next public demo after a trusted HTTPS call on two real devices, bilingual review, measured delays by direction, reconnect and consent checks, and matching evidence from both report views. Keep manual recorded turns and the hands-free phrase path available. Enable experimental early playback only after the same-recording comparison and device tests pass.
+
 ## Rules
 P0 is a demo-grade product, not a production communications service. Only promise what is tested. All acceptance conditions below are observable behaviors, not descriptions of components. If a feature fails, do not present it as complete.
 

@@ -1,5 +1,9 @@
 # Risks, Assumptions and Decision Queue
 
+## Current release risks
+
+The laptop speaker reported acceptable translation and difficulty associating voice, caption and original with the same message. Verify the redesigned thread on both devices. The language direction, phone browser and audio route still need recording. Check mobile audio suspension, missed onset and speakerphone feedback first. A larger synthetic sample cannot close this gate. Hosted database timings in the phase ledger were collected from the workstation. Repeat on the deployed host. One Node relay holds live session state in memory, so a process restart can interrupt a phrase. Speaker-selected style and streaming revision experiments must preserve original recordings and report evidence. The Oregon host is reachable and the operator selected the original Tokyo project. Public DNS, trusted HTTPS and regional call latency still require verification.
+
 ## Risk register
 
 | Risk | Likelihood / Impact | Mitigation | Trigger for scope cut |

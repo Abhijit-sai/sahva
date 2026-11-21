@@ -1,5 +1,9 @@
 # Domain and Data Model
 
+## Release compatibility
+
+Migrations 001–004 define the room, seats, recording lease, turns, revisions, deliveries and canonical reports. Timing diagnostics can use optional numeric fields in the existing turn timings JSON plus listener-local playback observations. Missing fields on older or manual turns mean unobserved. Keep measurements out of report prompts. A future voice preference needs an additive participant default and a snapshot on the attributed turn so retries use the same voice. Document and test any migration with pre-existing rooms before deployment. Experimental stream generations and queues are ephemeral. Only committed attributed turns become report evidence.
+
 This is a **logical schema proposal**, not proof of migrated database tables. Start with the smallest executable migrations and extend via ADRs. The service layer, not UI state, owns validation and authorization.
 
 ## Core entities and relationships

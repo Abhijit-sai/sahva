@@ -1,5 +1,16 @@
 # Approach and Technical Architecture
 
+## Running system and directional experiment
+
+Next.js serves React, authenticated room HTTP routes and the server-side provider relay in one Node process. Room state uses PostgreSQL and private Supabase buckets in production, with PGlite and private files for local development. The AudioWorklet emits 16 kHz mono PCM every 200 ms. Local energy detection keeps a short onset buffer, a room lease selects one speaker, and the relay opens one Saaras WebSocket per phrase. The browser polls the timeline, including draft Mayura text. A provider final or manual finish archives the original WAV. Durable translation and Bulbul synthesis precede ordered playback. OpenAI reads finalized evidence for the canonical report and localization. ADR-0004 governs the live path.
+
+| Experimental direction | Capture and processing | Destination |
+| --- | --- | --- |
+| A → B | A microphone, A stream generation and sequence, A source-language ASR, stable segments translated to B's listening language | B's translated-audio queue |
+| B → A | B microphone, B stream generation and sequence, B source-language ASR, stable segments translated to A's listening language | A's translated-audio queue |
+
+Keep each original track separate from rendered audio. Share only approved terminology and finalized room context. Revisions may replace visible draft captions. Commit a stable clause with enough context for target word order before synthesis. Link each commit and ordered audio segment back to one attributed original. With bounded queues, surface backlog, preserve original evidence and offer phrase fallback. Headphone interruption cancels pending playback with replay available. Speakerphone suppresses capture during output. On reconnect invalidate the previous generation, reject late frames, reconcile archived turns and require microphone activation. Benchmark overlap, packet loss and lag separately before switching transport or lifting the production lease. Independent channels alone do not establish simultaneous interpretation.
+
 ## Crucial architectural choice
 Sahva P0 is a **synchronous-feeling, turn-based voice room** built from short recorded utterances. It is *not* a continuously streaming, two-way audio track. This is deliberate: for a 12-hour build, making the entire record/translate/playback/report loop reliable matters more than low-latency simultaneous interpretation. See ADR-0001.
 

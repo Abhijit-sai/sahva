@@ -2,7 +2,12 @@
 import { useState } from "react";
 import { api } from "./client";
 import { languages, type Language } from "../lib/shared";
+import type { TurnTiming } from "../lib/rehearsal";
 export type TurnView = {
+  live_timing?: TurnTiming | null;
+  translated_at?: number | null;
+  generated_at?: number | null;
+  transcribed_at?: number | null;
   id: string;
   seq: number;
   speaker_id: string;
@@ -33,6 +38,7 @@ export function TurnCard({
   own,
   active,
   onUpdate,
+  playing,
 }: {
   room: string;
   turn: TurnView;
@@ -40,6 +46,7 @@ export function TurnCard({
   own: boolean;
   active: boolean;
   onUpdate: () => void;
+  playing: boolean;
 }) {
   const [editing, setEditing] = useState(false),
     [error, setError] = useState(""),
@@ -47,11 +54,18 @@ export function TurnCard({
   const root = "/" + room + "/turns/" + turn.id;
   const media = "/api/v1/rooms/" + room + "/media/" + turn.id + "?kind=";
   return (
-    <article id={"turn-" + turn.id}>
+    <article
+      id={"turn-" + turn.id}
+      className={"chat-message " + (own ? "own" : "incoming")}
+    >
+      {playing && (
+        <small className="playing-label">
+          Playing in {languages[turn.target]}
+        </small>
+      )}
       <div className="turn-top">
-        <strong>{name}</strong>
+        <strong>{own ? "You" : name}</strong>
         <small>
-          Turn {turn.seq} ·{" "}
           {new Date(turn.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -59,44 +73,67 @@ export function TurnCard({
           · {(turn.duration_ms / 1000).toFixed(1)}s
         </small>
       </div>
-      <p className="status">
-        {turn.error
-          ? "Needs attention · " + stages[turn.stage]
-          : stages[turn.stage]}
-      </p>
-      <label>
-        Original recording {turn.source && "· " + languages[turn.source]}
-        <audio controls preload="none" src={media + "original"} />
-      </label>
-      {turn.voice && (
-        <label>
-          Synthetic voice · {languages[turn.target]}
+      {turn.stage !== "ready" && (
+        <p className="status" role="status">
+          {turn.error ? "Needs attention · " : ""}
+          {stages[turn.stage]}…
+        </p>
+      )}
+      <div className="voice-message">
+        {(own || turn.voice || turn.source === turn.target) && (
           <audio
             controls
             preload="none"
+            aria-label={
+              own
+                ? "Replay your message"
+                : turn.voice
+                  ? "Replay translated message"
+                  : "Replay message"
+            }
+            src={
+              media +
+              (own || !turn.voice
+                ? "original"
+                : "translation&v=" + turn.revision)
+            }
+          />
+        )}
+        {(own ? turn.current_text : turn.translated_text) && (
+          <p
+            className="message-caption"
+            lang={(own ? turn.source : turn.target) ?? undefined}
+          >
+            {own ? turn.current_text : turn.translated_text}
+          </p>
+        )}
+      </div>
+      <details className="message-original">
+        <summary>Original</summary>
+        <small>
+          {turn.source ? languages[turn.source] : "Source recording"}
+        </small>
+        <audio
+          aria-label="Original recording"
+          controls
+          preload="none"
+          src={media + "original"}
+        />
+        <p lang={turn.source ?? undefined}>
+          {turn.raw_text ?? "Transcript unavailable."}
+        </p>
+        {turn.revision > 0 && <p>Speaker correction · {turn.current_text}</p>}
+      </details>
+      {own && turn.voice && (
+        <details>
+          <summary>Sent translation · {languages[turn.target]}</summary>
+          <audio
+            controls
+            preload="none"
+            aria-label="Sent translated voice"
             src={media + "translation&v=" + turn.revision}
           />
-        </label>
-      )}
-      {turn.source === turn.target && turn.stage === "ready" && (
-        <small>The original is in the listener’s language.</small>
-      )}
-      {turn.raw_text && (
-        <details>
-          <summary>Original transcript</summary>
-          <p>{turn.current_text}</p>
-          {turn.revision > 0 && (
-            <>
-              <small>Speaker correction · revision {turn.revision}</small>
-              <p>Original ASR · {turn.raw_text}</p>
-            </>
-          )}
-        </details>
-      )}
-      {turn.translated_text && turn.source !== turn.target && (
-        <details>
-          <summary>Translated transcript · {languages[turn.target]}</summary>
-          <p>{turn.translated_text}</p>
+          <p lang={turn.target}>{turn.translated_text}</p>
         </details>
       )}
       {turn.error && (

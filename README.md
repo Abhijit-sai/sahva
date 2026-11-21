@@ -74,6 +74,8 @@ A Telugu-speaking user and an English-speaking user join one browser room, excha
 
 ## Live interpreter demo
 
-Create a room, then open its invitation in a second browser profile. Choose English for speaking and listening in one profile and Telugu in the other. Once both participants consent, each selects **Start hands-free**. Take turns speaking and pause at the end of each phrase. The listener sees live captions and a draft translation, then hears the translated voice. The microphone automatically listens for the next turn.
+Create a room, then open its invitation in a second browser profile. Choose English for speaking and listening in one profile and Telugu in the other. Once both participants consent, each selects **Join audio call**. Take turns speaking and pause at the end of each phrase. The listener sees live captions and a draft translation, then hears the translated voice. The microphone automatically listens for the next turn.
 
-With headphones, select **Using headphones · speak to interrupt playback** to start your reply while the translation is playing. **Mute microphone** releases your microphone. For a single phrase, use **Speak live** and enable incoming voice on the listener's side. Select **End room** to review the same meeting outcomes in either language and replay the supporting turns. [Delivery phases](docs/14_LIVE_DEMO_PHASES.md)
+Open **Audio options** for single-phrase recording and playback settings. Each incoming message shows the translated caption and replay in your listening language. Select **Original** on that message for the original recording and transcript.
+
+With headphones, select **Using headphones · speak to interrupt playback** to start your reply while the translation is playing. **Mute microphone** releases your microphone. For a single phrase, use **Speak live** and enable incoming voice on the listener's side. Select **End call** to review the same meeting outcomes in either language and replay the supporting turns. [Delivery phases](docs/14_LIVE_DEMO_PHASES.md)

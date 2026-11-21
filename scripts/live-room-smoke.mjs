@@ -55,8 +55,10 @@ try {
   await b.getByLabel("Your name").fill("English speaker");
   await b.getByRole("checkbox").check();
   await b.getByRole("button", { name: "Agree & join" }).click();
-  for (const p of [a, b])
+  for (const p of [a, b]) {
+    await p.getByText("Audio options", { exact: true }).click();
     await p.getByRole("button", { name: "Enable incoming voice" }).click();
+  }
   for (const [index, [speaker, listener, source, target]] of [
     [a, b, "te-IN", "en-IN"],
     [b, a, "en-IN", "te-IN"],
@@ -71,10 +73,10 @@ try {
     const partial = listener
       .locator('.live-caption[data-has-speech="true"]')
       .filter({ hasText: /speaker · Live caption/ })
-      .locator("p");
+      .locator("details p");
     await partial
       .filter({ hasText: /[\p{L}]{2}/u })
-      .waitFor({ timeout: 20000 });
+      .waitFor({ state: "attached", timeout: 20000 });
     const captionMs = Date.now() - start;
     await listener.getByText(/Draft translation/).waitFor({ timeout: 18000 });
     const draftMs = Date.now() - start;
@@ -83,7 +85,9 @@ try {
         .locator(".live-box")
         .screenshot({ path: process.env.SAHVA_SMOKE_SCREENSHOT });
     const card = listener.locator("article[id^=turn-]").nth(index);
-    await card.locator("audio").nth(1).waitFor({ timeout: 45000 });
+    await card
+      .getByLabel("Replay translated message")
+      .waitFor({ timeout: 45000 });
     await listener
       .getByText("Playing voice", { exact: true })
       .waitFor({ timeout: 15000 });
@@ -155,8 +159,10 @@ try {
     null,
   );
   await b.getByRole("button", { name: "Consent again" }).click();
+  if (!(await a.getByRole("button", { name: "Speak live" }).isVisible()))
+    await a.getByText("Audio options", { exact: true }).click();
   await a.getByRole("button", { name: "Speak live" }).waitFor();
-  await a.getByRole("button", { name: "End room" }).click();
+  await a.getByRole("button", { name: "End call" }).click();
   await a.locator(".citation").first().waitFor({ timeout: 100000 });
   await b.locator(".citation").first().waitFor({ timeout: 20000 });
   assert.equal(await a.getByLabel("Report language").inputValue(), "te-IN");

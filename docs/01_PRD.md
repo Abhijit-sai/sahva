@@ -1,4 +1,18 @@
-# Product Requirements Document — Sahva P0
+# Product Requirements Document — Sahva
+
+## Current release objective
+
+**Speak naturally. Understand everyone. Leave with clarity.** Two consenting guests choose speaking and listening languages in a browser room. Telugu and Indian English are the release pair. Each hears the remote translation, follows source captions and draft translations, and can replay the original. Support another language only after validating its provider routes and localized outcomes.
+
+| Capability | Evidence and release target |
+| --- | --- |
+| Conversation | LIVE-02 verified four alternating synthetic microphone phrases with real providers. One activation per person, one live speaker at a time. The first human rehearsal surfaced unspecified issues. Physical acceptance requires repeating both directions on phone and laptop. |
+| Translated speech | Two fixed target-language presets work in recorded tests. The release target is speaker selection, preview where practical and subsequent-turn changes. Evaluate natural pacing, questions and emphasis with bilingual listeners on identical sentences. Preserve meaning, names, dates, quantities and uncertainty. |
+| Shared outcomes | Private original and generated audio, source revisions and translations support one canonical report and localized views. Check decisions, proposals, owners, deadlines and evidence against actual speech in every rehearsal. |
+
+Independent directional processing and early playback are experiments. Reproducing vocal identity is future research requiring explicit speaker consent, deletion and provider review. Voice choice and expressive synthesis alone establish neither identity nor emotional fidelity.
+
+## Original buildathon requirements
 
 **Version:** 1.0 | **Status:** Proposed for initial build | **Timebox:** 12 hours | **Owner:** Product/engineering team
 

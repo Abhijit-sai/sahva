@@ -1,5 +1,11 @@
 # Proposed API, State and Event Contracts
 
+## Implemented live lifecycle and extension boundary
+
+The authenticated room routes use live/start, frame, interpret and finish. Start takes the recording lease. Frame validates ownership, sequence and byte limits. The polled timeline carries provisional/final captions and optional draft translation. Finish binds the original and final text to an idempotent turn. The existing processing stages expose translation, TTS, ready and retryable failure. Media retrieval requires the participant session. Playback start/end are listener events. Offline/page hide, consent withdrawal and explicit mute release capture. Reconnect requires a fresh gesture.
+
+For the directional experiment, scope speech detection, partial/final, translation revision, audio segment, playback/cancellation and error to speaker, stream generation and ordered segment. Ignore duplicate frames and stale generations. Display drafts immediately, queue only stable translations, and archive the associated source before admitting evidence to meeting intelligence. Expose incomplete or cancelled turns distinctly. These are proposed semantics for the experiment.
+
 > **Design proposal**, not deployed contract. Prefix routes with `/api/v1`. Validate request/response with a shared schema. All state-changing endpoints require room-scoped participant token and idempotency key where noted. JSON examples contain placeholders.
 
 ## Authentication and scope

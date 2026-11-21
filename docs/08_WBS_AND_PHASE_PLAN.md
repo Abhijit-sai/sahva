@@ -1,4 +1,16 @@
-# Work Breakdown Structure — 12-Hour Buildathon
+# Work breakdown and release plan
+
+## Active release sequence
+
+| Priority / ticket | Depends on | Expected behavior and acceptance | Validation | Status / primary risk |
+| --- | --- | --- | --- | --- |
+| P0 LIVE-03 | LIVE-02 | Two people alternate hands-free, see captions, hear the right translation and review the same supported outcomes. Measure both directions. | Follow the physical rehearsal in the QA playbook with headphones and speakers. Log the first failing stage and rerun the affected phrase. | In progress. Laptop translation was acceptable to the speaker. Verify the new message layout and physical audio. |
+| P1 SB-07-AWS | LIVE-03, authorized Oregon host and project | Commit-tagged single Node process serves trusted HTTPS with scoped private media, reconnect and bilingual reports. | Follow AWS runbook, record deployed SHA, readiness, negative access check and remote two-device smoke. | In progress. Oregon host authenticated and baseline container ready against Tokyo. Public hostname and physical evidence pending. |
+| P2 VOICE-01 | Stable phrase path | Speaker can select a supported voice and change future turns. Existing audio and reports remain replayable. | Check both directions, retry, reload, and paired listening for questions/emphasis and names. | Planned. Catalog and perceived quality differ by language. |
+| P3 STREAM-01 | Measured phrase baseline | Isolated trial with two independent directions, bounded ordered playback and stable text commitments. | Same clips on baseline and trial. Record overlap, revisions, latency, entity errors, intelligibility, cost and fallback. | Experimental. Early output can reverse intended meaning. |
+| P4 DEMO-01 | Physical and public gates, any enabled experiment qualified | Two devices, fresh utterance, canonical report, identical-recording baseline comparison, tested backup. | Bilingual reviewer signs off on differences or ties and known limits. Decode backup and rehearse recovery. | Open. Existing private synthetic backup covers LIVE-02. |
+
+Historical foundation tickets and original timing assumptions follow.
 
 **Method:** Matt Pocock-style vertical tracer bullets: each ticket should leave a feature demonstrable through UI/API/storage rather than deliver a standalone layer. This local file is the single ticket tracker until migrated to real issues. Update status **here**, but record factual completion evidence and handoff in `PROJECT_SUMMARY.md`.
 

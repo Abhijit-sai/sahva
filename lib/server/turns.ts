@@ -10,6 +10,8 @@ import { Problem, roomState } from "./rooms.ts";
 import { audioDuration, extensions } from "./audio.ts";
 import { save, bytesFor, playback } from "./storage.ts";
 
+import { serverTime, type TurnTiming } from "../rehearsal.ts";
+
 type Turn = {
   id: string;
   room_id: string;
@@ -49,6 +51,7 @@ export async function upload(
   person: string,
   form: FormData,
   final?: { text: string; source: Language },
+  timing?: TurnTiming,
 ) {
   const db = await database();
   requireConsent((await roomState(db.query, room, person)).canRecord);
@@ -97,7 +100,7 @@ export async function upload(
     const target = state.members.find((m) => m.id !== person)!.listening;
     await save("room-original-audio", key, bytes, mime);
     await q(
-      "insert into sahva.turns(id,room_id,speaker_id,seq,idem,mime,duration_ms,original_key,target,raw_text,source,stage) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+      "insert into sahva.turns(id,room_id,speaker_id,seq,idem,mime,duration_ms,original_key,target,raw_text,source,stage,timings) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)",
       [
         id,
         room,
@@ -111,6 +114,7 @@ export async function upload(
         final?.text ?? null,
         final?.source ?? null,
         final ? "translation" : "stt",
+        JSON.stringify(timing ? { live: timing } : {}),
       ],
     );
     return { id, seq };
@@ -121,6 +125,8 @@ export async function timeline(room: string, person: string) {
   const state = await roomState(db.query, room, person);
   const turns = await db.query(
     `select t.id,t.seq,t.speaker_id,t.duration_ms,t.created_at,t.source,t.raw_text,t.target,t.revision,t.stage,t.error,t.retries,
+    t.timings->'live' as live_timing, t.timings->'translation'->'at' as translated_at,
+    t.timings->'tts'->'at' as generated_at, t.timings->'stt'->'at' as transcribed_at,
     coalesce(r.text,t.raw_text) as current_text,d.text as translated_text,(d.audio_key is not null) as voice,
     (t.lease_until>now()) is true as busy from sahva.turns t
     left join sahva.revisions r on r.turn_id=t.id and r.num=t.revision
@@ -263,18 +269,27 @@ export async function processStage(
         raw = result.text;
         source = result.language;
         next = "translation";
-        receipt = { ms: result.elapsedMs, id: result.requestId };
+        receipt = {
+          ms: result.elapsedMs,
+          id: result.requestId,
+          at: serverTime(),
+        };
       } else if (t.stage === "translation") {
         const result = await speech.translate(sourceText!, source!, t.target);
         translated = result.text;
         next = "tts";
-        receipt = { ms: result.elapsedMs, id: result.requestId };
+        receipt = {
+          ms: result.elapsedMs,
+          id: result.requestId,
+          at: serverTime(),
+        };
       } else {
         const [delivery] = await db.query<{ text: string }>(
           "select text from sahva.deliveries where turn_id=$1 and revision=$2",
           [id, t.revision],
         );
         const result = await speech.synthesize(delivery.text, t.target);
+        const generatedAt = serverTime();
         audioKey = room + "/" + id + "/" + t.revision + "-" + lease + ".wav";
         await save(
           "room-translated-audio",
@@ -282,7 +297,11 @@ export async function processStage(
           result.audio,
           "audio/wav",
         );
-        receipt = { ms: result.elapsedMs, id: result.requestId };
+        receipt = {
+          ms: result.elapsedMs,
+          id: result.requestId,
+          at: generatedAt,
+        };
       }
     }
     await db.transaction(async (q) => {

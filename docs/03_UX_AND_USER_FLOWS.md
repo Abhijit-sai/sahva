@@ -1,5 +1,9 @@
 # UX Blueprint and State Flows
 
+## Two-person audio call
+
+The laptop speaker reported that translation worked in the first rehearsal. The interface made it unclear which voice and text belonged to each message. Keep participants and call controls alongside the thread. On a phone, show controls and messages in the same scrolling view. One explicit call activation enables incoming audio and hands-free capture. A remote phrase plays in the listener's selected language as soon as it is ready and safe to play. Attach its translated caption and replay control to the same attributed message. **Original** reveals the source recording and transcription together. Own messages prioritize what the speaker actually said. Keep manual recording and diagnostics secondary.
+
 ## Layout
 Desktop 60/40 or 50/50 split: **left = live room controls/presence**; **right = conversation timeline / report**. On mobile, switch with accessible `Room` / `Conversation` tabs. No video. Clear label: **'Turn-based audio room'**, not 'simultaneous call'. Minimal navigation.
 

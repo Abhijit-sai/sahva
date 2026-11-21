@@ -42,9 +42,12 @@ async function seat(wav) {
   return page;
 }
 const click = (p, name) => p.getByRole("button", { name, exact: true }).click();
+const seats = [];
 try {
   const a = await seat("telugu.wav"),
     b = await seat("english.wav");
+  seats.push(a, b);
+  await b.setViewportSize({ width: 390, height: 844 });
   await a.goto(origin);
   await a.getByLabel("Your name").fill("Anu");
   await a.getByLabel("Speak in").selectOption("te-IN");
@@ -65,13 +68,14 @@ try {
       if (req.url().endsWith("/live/start")) starts++;
       if (req.url().endsWith("/live/finish")) finishAt = Date.now();
     });
-    await click(p, "Start hands-free");
+    await click(p, "Join audio call");
     await p
       .getByRole("button", { name: "Mute microphone", exact: true })
       .waitFor();
   }
   await sleep(1200);
   assert.equal(starts, 0);
+  await a.getByText("Audio options", { exact: true }).click();
   await a.getByLabel(/Using headphones/).check();
   let interruptedAt;
   for (let i = 0; i < 4; i++) {
@@ -100,6 +104,31 @@ try {
     const turn = data.turns[i];
     assert.equal(turn.source, i % 2 ? "en-IN" : "te-IN");
     assert.equal(turn.voice, true);
+    const message = listener.locator("#turn-" + turn.id);
+    assert.equal(
+      await message.locator(".message-caption").innerText(),
+      turn.translated_text,
+    );
+    assert.ok(
+      (
+        await message
+          .getByLabel("Replay translated message")
+          .getAttribute("src")
+      ).includes("kind=translation"),
+    );
+    await message.getByText("Original", { exact: true }).click();
+    assert.ok(await message.getByLabel("Original recording").isVisible());
+    assert.equal(
+      await message.locator(".message-original p").first().innerText(),
+      turn.raw_text,
+    );
+    await message.getByText("Original", { exact: true }).click();
+    assert.ok(turn.live_timing?.capture?.onset > 0);
+    assert.ok(
+      turn.live_timing.capture.lastVoiced >= turn.live_timing.capture.onset,
+    );
+    assert.ok(turn.live_timing.final >= turn.live_timing.interim);
+    assert.ok(turn.generated_at >= turn.translated_at);
     const original = await listener.request.get(
       api + "/media/" + turn.id + "?kind=original",
     );
@@ -138,6 +167,9 @@ try {
     );
   }
   assert.equal(starts, 4);
+  assert.ok(await b.locator(".conversation-panel").isVisible(), "Phone view must show messages during the call");
+  if (process.env.SAHVA_SMOKE_SCREENSHOT)
+    await b.screenshot({path: process.env.SAHVA_SMOKE_SCREENSHOT, fullPage: true});
   const replay = a.locator("article audio").first();
   await replay.evaluate((audio) => audio.play());
   await a.evaluate(() => window.qaSpeak(1.4));
@@ -149,7 +181,7 @@ try {
   await a.evaluate(() => window.qaSpeak(0.8));
   await sleep(1200);
   assert.equal(starts, 4);
-  await click(a, "Start hands-free");
+  await click(a, "Join audio call");
   await a
     .getByRole("button", { name: "Mute microphone", exact: true })
     .waitFor();
@@ -157,9 +189,9 @@ try {
   await a.waitForFunction(() => window.qaTracks() === 0);
   await a.context().setOffline(false);
   await a
-    .getByRole("button", { name: "Start hands-free", exact: true })
+    .getByRole("button", { name: "Join audio call", exact: true })
     .waitFor({ timeout: 10000 });
-  await click(a, "Start hands-free");
+  await click(a, "Join audio call");
   await a
     .getByRole("button", { name: "Mute microphone", exact: true })
     .waitFor();
@@ -167,7 +199,7 @@ try {
   for (const p of [a, b])
     await p.waitForFunction(() => window.qaTracks() === 0);
   await click(b, "Consent again");
-  await click(a, "End room");
+  await click(a, "End call");
   for (const p of [a, b])
     await p.locator(".citation").first().waitFor({ timeout: 100000 });
   assert.equal(
@@ -176,9 +208,34 @@ try {
   );
   assert.equal(await a.getByLabel("Report language").inputValue(), "te-IN");
   assert.equal(await b.getByLabel("Report language").inputValue(), "en-IN");
+  for (const [page, direction] of [
+    [a, "en-IN to te-IN"],
+    [b, "te-IN to en-IN"],
+  ]) {
+    await page.getByText("Rehearsal timings", { exact: true }).click();
+    const table = page
+      .getByRole("table")
+      .filter({ hasText: "Ready observed to playback" });
+    assert.equal(
+      await table
+        .getByRole("row", { name: /^Speech end to playback / })
+        .locator("td")
+        .first()
+        .textContent(),
+      "2",
+    );
+    console.log(direction, await table.innerText());
+  }
   console.log(
     "PASS: four alternating hands-free turns, silence, speaker bleed suppression, spoken and button interruptions, mute, offline/re-arm, consent shutdown and both reports.",
   );
+} catch (error) {
+  for (const page of seats) {
+    console.error("Call state", await page.locator(".live-heading span").allTextContents(),
+      "messages", await page.locator("article.chat-message").count(),
+      "alerts", await page.getByRole("alert").allTextContents());
+  }
+  throw error;
 } finally {
   await browser.close();
 }

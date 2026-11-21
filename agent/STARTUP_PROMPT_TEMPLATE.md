@@ -33,7 +33,7 @@ REPOSITORY PRE-FLIGHT — READ ONLY BEFORE MUTATION
 - Identify current P0 progress and single highest-priority unblocked ticket.
 
 PRODUCT INVARIANTS
-- P0: two-person AUDIO-ONLY, TURN-BASED browser room. No video, PSTN, WhatsApp, open microphone, simultaneous interpretation, or extra languages.
+- Current release: two-person audio room with opt-in hands-free capture, live captions and one phrase lease under ADR-0004. Use the active release sequence at the top of the WBS and the newest physical-rehearsal evidence.
 - Explicit consent; source audio immutable; client tokens room-scoped; provider keys server-only.
 - Each turn (<=25s UI max) saves original audio then ASR, translation and synthetic audio.
 - Timeline shows original + translated playback, optional source/translated transcripts and status/retry.

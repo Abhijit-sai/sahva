@@ -8,7 +8,10 @@ import { SarvamSpeech } from "../providers/sarvam.ts";
 import { upload } from "./turns.ts";
 import type { Language } from "../shared.ts";
 
+import { serverTime, type TurnTiming } from "../rehearsal.ts";
+
 type Session = {
+  timing: TurnTiming;
   room: string;
   person: string;
   key: string;
@@ -54,6 +57,7 @@ export function liveCaption(room: string) {
   return s
     ? {
         speaker: s.person,
+        interimAt: s.timing.interim,
         text: s.text,
         translated: s.translated,
         target: s.target,
@@ -108,6 +112,7 @@ export async function beginLive(room: string, person: string) {
     key,
     language: state.me.speaking,
     target: state.members.find((m) => m.id !== person)!.listening,
+    timing: {},
     translated: "",
     lastAttempt: 0,
     lastText: "",
@@ -132,6 +137,9 @@ export async function beginLive(room: string, person: string) {
       const data: unknown = JSON.parse(raw.toString());
       const item = caption.safeParse(data);
       if (item.success && !s.final) {
+        if (item.data.event === "transcript.final")
+          s.timing.final = serverTime();
+        else s.timing.interim ??= serverTime();
         s.text = item.data.text;
         s.final = item.data.event === "transcript.final";
       } else if (
@@ -237,8 +245,19 @@ function wave(samples: Buffer, rate = 16000) {
   return Buffer.concat([h, samples]);
 }
 export async function finishLive(room: string, person: string, input: unknown) {
-  const { key, cancel } = z
-    .object({ key: z.uuid(), cancel: z.boolean().default(false) })
+  const { key, cancel, capture } = z
+    .object({
+      key: z.uuid(),
+      cancel: z.boolean().default(false),
+      capture: z
+        .object({
+          onset: z.int().positive(),
+          lastVoiced: z.int().positive(),
+          uncertainty: z.int().nonnegative().max(60000),
+        })
+        .optional()
+        .catch(undefined),
+    })
     .parse(input);
   const s = streams.get(room);
   if (!s || s.key !== key || s.person !== person) {
@@ -272,11 +291,20 @@ export async function finishLive(room: string, person: string, input: unknown) {
     "phrase.wav",
   );
   form.set("idempotencyKey", key);
+  const now = serverTime();
+  if (
+    capture &&
+    capture.onset >= now - 65000 &&
+    capture.lastVoiced >= capture.onset &&
+    capture.lastVoiced <= now + capture.uncertainty
+  )
+    s.timing.capture = capture;
   s.saving = upload(
     room,
     person,
     form,
     s.final ? { text: s.text, source: s.language } : undefined,
+    s.timing,
   )
     .then(async (saved) => {
       dispose(s);

@@ -1,3 +1,4 @@
+import type { CaptureTiming } from "../lib/rehearsal";
 import { api } from "./client";
 import { listenPcm, type FrameConsumer } from "./pcm-input";
 export type PhraseInput = (receive: FrameConsumer) => () => void;
@@ -11,6 +12,7 @@ export async function openLiveMicrophone(
   onSaved: () => void,
   onError: (message: string) => void,
   input?: PhraseInput,
+  capture?: () => CaptureTiming | undefined,
 ) {
   const path = "/" + room + "/live/";
   let key: string | undefined, releaseInput: (() => void) | undefined;
@@ -41,11 +43,12 @@ export async function openLiveMicrophone(
     try {
       await tail;
       if (disposed) return;
+      const body = { key, capture: capture?.() };
       try {
-        await api(path + "finish", { key });
+        await api(path + "finish", body);
       } catch (e) {
         if (!(e instanceof TypeError) || disposed) throw e;
-        await api(path + "finish", { key });
+        await api(path + "finish", body);
       }
       if (!disposed) onSaved();
     } catch (e) {

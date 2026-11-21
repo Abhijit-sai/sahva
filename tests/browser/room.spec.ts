@@ -59,6 +59,7 @@ test("a recorded browser turn survives STT failure, retry and reload with privat
   await second.getByLabel("Listen in").selectOption("te-IN");
   await second.getByRole("checkbox").check();
   await second.getByRole("button", { name: "Agree & join" }).click();
+  await page.getByText("Audio options", { exact: true }).click();
   await page.getByRole("button", { name: "Record a turn" }).click();
   await expect(
     page.getByRole("button", { name: /Stop recording · 1s/ }),
@@ -72,7 +73,11 @@ test("a recorded browser turn survives STT failure, retry and reload with privat
       "Speech provider is not configured. The original is saved.",
     ),
   ).toBeVisible({ timeout: 20000 });
-  const audio = second.locator("article audio").first();
+  await second
+    .locator("article")
+    .getByText("Original", { exact: true })
+    .click();
+  const audio = second.getByLabel("Original recording");
   const url = await audio.getAttribute("src");
   const original = await guest.request.get(new URL(url!, second.url()).href);
   expect(original.status()).toBe(200);

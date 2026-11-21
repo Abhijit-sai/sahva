@@ -320,3 +320,141 @@ article form {
 .live-translation p {
   margin: 4px 0 0;
 }
+
+.call-workspace {
+  padding: clamp(20px, 3vw, 44px);
+}
+.call-workspace h1 {
+  font-size: clamp(32px, 4vw, 48px);
+  overflow-wrap: anywhere;
+}
+.call-layout {
+  grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1.7fr);
+  gap: clamp(16px, 3vw, 40px);
+}
+.call-layout section {
+  padding: clamp(16px, 2vw, 28px);
+  min-width: 0;
+}
+.call-layout h2 {
+  font-size: 26px;
+}
+.call-layout .member {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 0 10px;
+  align-items: center;
+}
+.member .avatar {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #dce9df;
+  color: var(--accent);
+  font-weight: 650;
+}
+.member strong {
+  overflow-wrap: anywhere;
+}
+.call-layout .live-heading h3 {
+  font:
+    600 16px/1.35 "Segoe UI",
+    sans-serif;
+}
+.call-layout .live-heading span {
+  text-align: right;
+}
+.audio-options {
+  margin-top: 12px;
+}
+.conversation-panel {
+  background: #fffef9;
+}
+.chat-message {
+  width: fit-content;
+  min-width: min(270px, 100%);
+  max-width: min(90%, 550px);
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid #d9e1d9;
+  border-radius: 14px 14px 14px 3px;
+  background: #f3f6f0;
+}
+.chat-message.own {
+  margin-left: auto;
+  background: #e1eee4;
+  border-color: #c5d9cb;
+  border-radius: 14px 14px 3px 14px;
+}
+.chat-message .turn-top {
+  gap: 4px 18px;
+}
+.chat-message .turn-top small,
+.chat-message summary {
+  font-size: 13px;
+}
+.voice-message audio,
+.message-original audio {
+  max-width: 100%;
+  min-width: 0;
+  margin: 8px 0;
+}
+.chat-message p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.message-caption {
+  font-size: 16px;
+  line-height: 1.55;
+}
+.playing-label {
+  font-weight: 650;
+  color: var(--accent);
+}
+.empty-chat {
+  color: var(--muted);
+  padding-block: 24px;
+}
+.call-workspace > details {
+  margin: 28px 0;
+  overflow-x: auto;
+}
+.call-workspace table {
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.call-workspace th,
+.call-workspace td {
+  padding: 4px 9px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+.call-workspace th:first-child {
+  text-align: left;
+}
+@media (max-width: 760px) {
+  .call-layout {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 16px;
+  }
+  .call-workspace {
+    padding: 16px 12px 32px;
+  }
+  .call-layout .room-panel h2 {
+    font-size: 20px;
+  }
+  .call-layout .member {
+    padding: 8px 0;
+  }
+  .call-layout .live-box {
+    margin-top: 8px;
+    padding: 12px 0;
+  }
+  .chat-message {
+    max-width: 95%;
+  }
+}

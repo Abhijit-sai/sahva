@@ -24,6 +24,7 @@ import {
   revise,
   processStage,
 } from "../../../../../lib/server/turns";
+import { serverTime } from "../../../../../lib/rehearsal";
 import { consentVersion } from "../../../../../lib/shared";
 
 export const runtime = "nodejs";
@@ -111,6 +112,7 @@ async function handle(req: NextRequest, context: Params) {
       const snapshot = await timeline(id, participant);
       return json({
         ...snapshot,
+        serverTime: serverTime(),
         caption: snapshot.canRecord ? liveCaption(id) : null,
       });
     }

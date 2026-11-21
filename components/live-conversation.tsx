@@ -2,6 +2,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { languages, type Language, type Member } from "../lib/shared";
 import type { TurnView } from "./turn-card";
+import type { ClockSample } from "../lib/rehearsal";
+import type { PlaybackObservation } from "./rehearsal";
 import { armHandsFree } from "./hands-free";
 import { Recorder } from "./recorder";
 import { RoomRequestError } from "./client";
@@ -9,6 +11,7 @@ import { openLiveMicrophone, type PhraseInput } from "./live-microphone";
 
 export type Caption = {
   speaker: string;
+  interimAt?: number;
   text: string;
   final: boolean;
   translated: string;
@@ -21,6 +24,8 @@ type Props = {
   caption: Caption | null;
   turns: TurnView[];
   refresh: () => void;
+  clock: ClockSample | null;
+  onPlayback: (id: string, event: PlaybackObservation) => void;
 };
 export function LiveConversation({
   room,
@@ -29,6 +34,8 @@ export function LiveConversation({
   caption,
   turns,
   refresh,
+  clock,
+  onPlayback,
 }: Props) {
   const [mode, setMode] = useState<"idle" | "opening" | "speaking" | "saving">(
     "idle",
@@ -43,12 +50,45 @@ export function LiveConversation({
   const monitor = useRef<AbortController | null>(null);
   const blocked = useRef(false),
     echoUntil = useRef(0);
+  const timing = useRef({ clock, onPlayback });
+  useLayoutEffect(() => {
+    timing.current = { clock, onPlayback };
+  }, [clock, onPlayback]);
+  const interrupted = useRef(false);
+  function stopPlayback() {
+    if (!playSource.current) return;
+    interrupted.current = true;
+    playSource.current.stop();
+  }
   const [playing, setPlaying] = useState(false);
   const active = useRef<AbortController | null>(null),
     stop = useRef<(() => Promise<void>) | null>(null);
   const player = useRef<AudioContext | null>(null),
     playSource = useRef<AudioBufferSourceNode | null>(null);
-  const [heard, setHeard] = useState(() => new Set<string>());
+  const [archivePlaying, setArchivePlaying] = useState(false);
+  useEffect(() => {
+    const media = () => Array.from(document.querySelectorAll("audio"));
+    const update = () =>
+      setArchivePlaying(media().some((audio) => !audio.paused && !audio.ended));
+    const play = (event: Event) => {
+      if (!(event.target instanceof HTMLAudioElement)) return;
+      stopPlayback();
+      for (const audio of media())
+        if (audio !== event.target && !audio.paused) audio.pause();
+      update();
+    };
+    document.addEventListener("play", play, true);
+    document.addEventListener("pause", update, true);
+    document.addEventListener("ended", update, true);
+    return () => {
+      document.removeEventListener("play", play, true);
+      document.removeEventListener("pause", update, true);
+      document.removeEventListener("ended", update, true);
+    };
+  }, []);
+  const [heard, setHeard] = useState(
+    () => new Set(turns.filter((t) => t.stage === "ready").map((t) => t.id)),
+  );
   const [playTick, advance] = useState(0);
   useEffect(
     () => () => {
@@ -85,6 +125,7 @@ export function LiveConversation({
   useEffect(() => {
     if (
       !listening ||
+      archivePlaying ||
       mode !== "idle" ||
       me.recording ||
       peer.recording ||
@@ -109,7 +150,15 @@ export function LiveConversation({
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(ctx.destination);
+      const sample = timing.current.clock;
+      let observation: PlaybackObservation | undefined;
       source.onended = () => {
+        if (observation && sample)
+          timing.current.onPlayback(id, {
+            ...observation,
+            ended: Math.round(performance.now() + sample.offset),
+            interrupted: interrupted.current,
+          });
         if (playSource.current === source) {
           echoUntil.current = performance.now() + 350;
           playSource.current = null;
@@ -117,9 +166,19 @@ export function LiveConversation({
           advance((n) => n + 1);
         }
       };
+      if (ctx.state !== "running")
+        throw Error("Incoming audio needs a playback gesture.");
+      source.start();
+      interrupted.current = false;
       playSource.current = source;
       setHeard((prev) => new Set([...prev, id]));
-      source.start();
+      if (sample) {
+        observation = {
+          started: Math.round(performance.now() + sample.offset),
+          uncertainty: sample.uncertainty,
+        };
+        timing.current.onPlayback(id, observation);
+      }
       setPlaying(true);
     }
     void play().catch(() => {
@@ -143,22 +202,16 @@ export function LiveConversation({
     listening,
     mode,
     playTick,
+    archivePlaying,
   ]);
   async function enableSound() {
     player.current ??= new AudioContext();
     await player.current.resume();
-    setHeard(
-      (prev) =>
-        new Set([
-          ...prev,
-          ...turns.filter((t) => t.stage === "ready").map((t) => t.id),
-        ]),
-    );
     setListening(true);
   }
   async function toggleSound() {
     if (listening) {
-      playSource.current?.stop();
+      stopPlayback();
       setListening(false);
       return;
     }
@@ -180,9 +233,13 @@ export function LiveConversation({
       void stop.current();
     } else active.current?.abort();
   }
-  async function start(input?: PhraseInput) {
+  async function start(
+    input?: PhraseInput,
+    activity?: { onset: number; lastVoiced: number },
+  ) {
+    const sample = timing.current.clock;
     if (active.current) return;
-    if (input && allowVoiceInterrupt.current) playSource.current?.stop();
+    if (input && allowVoiceInterrupt.current) stopPlayback();
     setWords("");
     setError("");
     setMode("opening");
@@ -215,6 +272,14 @@ export function LiveConversation({
           }
         },
         input,
+        () =>
+          activity && sample
+            ? {
+                onset: Math.round(activity.onset + sample.offset),
+                lastVoiced: Math.round(activity.lastVoiced + sample.offset),
+                uncertainty: sample.uncertainty,
+              }
+            : undefined,
       );
       if (!controller.signal.aborted) stop.current = finish;
       await finished;
@@ -296,14 +361,12 @@ export function LiveConversation({
       window.removeEventListener("pagehide", disconnect);
     };
   }, []);
-  const last = turns.at(-1);
-  const text = caption?.text || (mode === "speaking" ? words : "");
   return (
     <>
       <div className="live-box">
         <div className="live-heading">
-          <h3>Live interpreter</h3>
-          <span>
+          <h3>Call audio</h3>
+          <span role="status">
             {playing
               ? "Playing voice"
               : mode === "speaking"
@@ -312,11 +375,11 @@ export function LiveConversation({
                   ? "Partner speaking"
                   : hands === "armed"
                     ? "Listening for your voice"
-                    : "Ready"}
+                    : "Microphone off"}
           </span>
         </div>
         <p className="live-route">
-          You speak {languages[me.speaking]}. {peer.name} listens in{" "}
+          You hear {languages[me.listening]}. {peer.name} hears{" "}
           {languages[peer.listening]}.
         </p>
         {hands === "off" ? (
@@ -324,7 +387,7 @@ export function LiveConversation({
             disabled={mode !== "idle" || manualBusy}
             onClick={() => void enableHands()}
           >
-            Start hands-free
+            Join audio call
           </button>
         ) : (
           <button onClick={muteMicrophone}>
@@ -332,95 +395,61 @@ export function LiveConversation({
           </button>
         )}
         {playing && hands === "armed" && (
-          <button
-            className="secondary"
-            onClick={() => playSource.current?.stop()}
-          >
+          <button className="secondary" onClick={stopPlayback}>
             Interrupt playback
           </button>
         )}
-        {hands === "armed" && (
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={headphones}
-              onChange={(event) => setHeadphones(event.target.checked)}
-            />{" "}
-            Using headphones · speak to interrupt playback
-          </label>
-        )}
-        {hands === "off" &&
-          (mode === "speaking" ? (
-            <button
-              onClick={() => {
-                setMode("saving");
-                void stop.current?.();
-              }}
-            >
-              Finish phrase
-            </button>
-          ) : (
-            <button
-              disabled={
-                mode !== "idle" || peer.recording || playing || manualBusy
-              }
-              onClick={() => void start()}
-            >
-              {mode === "opening"
-                ? "Opening microphone…"
-                : mode === "saving"
-                  ? "Saving phrase…"
-                  : "Speak live"}
-            </button>
-          ))}
-        <button
-          className="secondary"
-          aria-pressed={listening}
-          onClick={() => void toggleSound()}
-        >
-          {listening ? "Mute incoming voice" : "Enable incoming voice"}
-        </button>
-        <div className="live-caption" data-has-speech={!!text} role="status">
-          <small>
-            {caption
-              ? (caption.speaker === me.id ? "You" : peer.name) +
-                " · Live caption"
-              : "Live caption"}
-          </small>
-          <p>
-            {text ||
-              (mode === "speaking"
-                ? "Listening…"
-                : hands === "armed"
-                  ? playing
-                    ? headphones
-                      ? "Speak to interrupt the translation."
-                      : "Listening resumes after playback."
-                    : peer.recording
-                      ? "Your partner has the microphone."
-                      : "Speak naturally. A pause sends your phrase."
-                  : "Start hands-free, or tap Speak live for one phrase.")}
-          </p>
-        </div>
-        {caption?.translated && (
-          <div className="live-translation" aria-live="polite">
-            <small>{languages[caption.target]} · Draft translation</small>
-            <p>{caption.translated}</p>
+        <details className="audio-options">
+          <summary>Audio options</summary>
+          <button
+            className="secondary"
+            aria-pressed={listening}
+            onClick={() => void toggleSound()}
+          >
+            {listening ? "Mute incoming voice" : "Enable incoming voice"}
+          </button>
+          {hands === "armed" && (
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={headphones}
+                onChange={(event) => setHeadphones(event.target.checked)}
+              />
+              Using headphones · speak to interrupt playback
+            </label>
+          )}
+          {hands === "off" &&
+            (mode === "speaking" ? (
+              <button
+                onClick={() => {
+                  setMode("saving");
+                  void stop.current?.();
+                }}
+              >
+                Finish phrase
+              </button>
+            ) : (
+              <button
+                disabled={
+                  mode !== "idle" || peer.recording || playing || manualBusy
+                }
+                onClick={() => void start()}
+              >
+                {mode === "opening"
+                  ? "Opening microphone…"
+                  : mode === "saving"
+                    ? "Saving phrase…"
+                    : "Speak live"}
+              </button>
+            ))}
+          <div hidden={hands !== "off" || mode !== "idle"}>
+            <Recorder room={room} onUploaded={refresh} onBusy={setManualBusy} />
           </div>
-        )}
-        {!caption && last?.translated_text && (
-          <div className="live-translation">
-            <small>
-              {languages[last.target]} ·{" "}
-              {last.source === last.target ? "Original" : "Translation"}
-            </small>
-            <p>{last.translated_text}</p>
-          </div>
+        </details>
+        {mode === "speaking" && !caption?.text && words && (
+          <p className="live-caption">{words}</p>
         )}
         {error && <p role="alert">{error}</p>}
-      </div>
-      <div hidden={hands !== "off" || mode !== "idle"}>
-        <Recorder room={room} onUploaded={refresh} onBusy={setManualBusy} />
       </div>
     </>
   );

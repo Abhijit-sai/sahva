@@ -1,5 +1,14 @@
 # QA Plan and Live Demo Playbook
 
+## Phone and laptop rehearsal · LIVE-03
+
+1. Use a browser-trusted HTTPS origin with the current build on both devices. A phone's localhost points to the phone. Start in separate quiet spaces with headphones. Record device, OS/browser, network, build revision and audio route.
+2. Create a fresh English-speaking/listening room on the laptop. Open the complete invitation on the phone, select Telugu for speaking and listening, and consent on both devices. Deny microphone once, restore permission in browser settings, then tap **Join audio call** on each. Check the listening indicator.
+3. Alternate four fresh phrases. On the phone, name a person, quantity and weekday in Telugu. On the laptop, ask a question in English. Propose one action, then explicitly agree to a different one. Pause naturally. Per phrase, note who spoke, first syllable, attributed captions, draft, original and translated playback, and any missing or repeated speech.
+4. Repeat on device speakers with the headphone interruption option off. Check that generated audio never creates another turn. Try simultaneous starts, headphone interruption, background/foreground, temporary network loss during speech, explicit re-arm and mute. Note any lost phrase and recovery message. Repeat in light background noise.
+5. Before ending, capture timing counts, median, p95 and maximum by direction and setup. Separate device playback observation from what the listener actually heard. Then end the room, compare both report views, verify quantities, tentative commitments and absent deadlines, and replay the original for each cited outcome.
+6. Record the first failure with device, direction, turn number, expected vs observed behavior and last successful stage. Keep URLs, names, audio and transcripts out of the shared ledger. Check archived evidence separately with consent. Use the same audio bytes for the base-model comparison in [the voice cases](../qa/VOICE_TEST_CASES.md).
+
 **Status:** proposed test plan. No tests or measurements have been performed by writing this document.
 
 ## Quality strategy

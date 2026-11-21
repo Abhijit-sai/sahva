@@ -10,3 +10,4 @@ playwright-report
 **/*.mp4
 **/*.webm
 
+**/*.pem

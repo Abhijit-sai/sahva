@@ -27,6 +27,7 @@ test("four consented voice notes through two sessions, both speech directions an
   await second.getByLabel("Your name").fill("Speaker B");
   await second.getByRole("checkbox").check();
   await second.getByRole("button", { name: "Agree & join" }).click();
+  await page.getByText("Audio options", { exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Record a turn" }),
   ).toBeVisible();
@@ -73,8 +74,7 @@ test("four consented voice notes through two sessions, both speech directions an
     const card = recipient.locator("#turn-" + id);
     await expect(card.locator("audio")).toHaveCount(2);
     const playable = await card
-      .locator("audio")
-      .nth(1)
+      .getByLabel("Replay translated message")
       .evaluate(async (a: HTMLAudioElement) => {
         await a.play();
         a.pause();
@@ -103,7 +103,7 @@ test("four consented voice notes through two sessions, both speech directions an
     data: {},
   });
   expect(forbidden.status()).toBe(403);
-  await page.getByRole("button", { name: "End room" }).click();
+  await page.getByRole("button", { name: "End call" }).click();
   const getReport = async (lang: string) =>
     await (await second.request.get(api + "/report?lang=" + lang)).json();
   await expect
