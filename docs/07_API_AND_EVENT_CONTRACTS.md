@@ -128,3 +128,7 @@ End freezes new turns. POST report/generate or report/retry is an awaited, lease
 ## Live phrase extension
 
 Authenticated POSTs under the existing room API use the same CSRF header. `live/start` acquires the microphone lease, verifies consent and opens the server-side provider session. It returns a phrase key. `live/frame` accepts that key, a zero-based sequence and base64 mono signed 16-bit PCM at 16 kHz. Repeat frames are ignored and out-of-order frames are rejected. `live/interpret` coalesces translation requests for changing captions. The timeline's optional `caption` contains the current speaker, source text, draft translation, target language and final flag while both members consent. `live/finish` accepts the key and an optional cancel flag. It saves one original WAV and the final transcript when available. Repeated finishes return the saved turn. Drafts never enter the meeting record.
+
+## Cross-region capture
+
+The live start route acquires the room lease and uses the authorized state returned by that same transaction for speaker and listener languages. The microphone keeps up to six seconds of onset audio locally while opening the lease. Frame uploads normally carry 200 ms and can combine two consecutive frames into a 400 ms message while a request is outstanding. Sequence numbers count HTTP messages. The relay still enforces its 16,000-byte limit and archives the exact PCM sequence. Backpressure beyond the bounded queue prompts the speaker to review the saved phrase. The listener can open Original on that message.

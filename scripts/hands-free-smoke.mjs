@@ -13,6 +13,16 @@ const browser = await chromium.launch({
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function seat(wav) {
   const page = await browser.newPage();
+  if (process.env.SAHVA_SMOKE_SLOW_LINK === "1") {
+    await page.route("**/live/start", async (route) => {
+      await sleep(2600);
+      await route.continue();
+    });
+    await page.route("**/live/frame", async (route) => {
+      await sleep(220);
+      await route.continue();
+    });
+  }
   await page.addInitScript(
     (base64) => {
       const tracks = [];
@@ -167,9 +177,15 @@ try {
     );
   }
   assert.equal(starts, 4);
-  assert.ok(await b.locator(".conversation-panel").isVisible(), "Phone view must show messages during the call");
+  assert.ok(
+    await b.locator(".conversation-panel").isVisible(),
+    "Phone view must show messages during the call",
+  );
   if (process.env.SAHVA_SMOKE_SCREENSHOT)
-    await b.screenshot({path: process.env.SAHVA_SMOKE_SCREENSHOT, fullPage: true});
+    await b.screenshot({
+      path: process.env.SAHVA_SMOKE_SCREENSHOT,
+      fullPage: true,
+    });
   const replay = a.locator("article audio").first();
   await replay.evaluate((audio) => audio.play());
   await a.evaluate(() => window.qaSpeak(1.4));
@@ -231,9 +247,14 @@ try {
   );
 } catch (error) {
   for (const page of seats) {
-    console.error("Call state", await page.locator(".live-heading span").allTextContents(),
-      "messages", await page.locator("article.chat-message").count(),
-      "alerts", await page.getByRole("alert").allTextContents());
+    console.error(
+      "Call state",
+      await page.locator(".live-heading span").allTextContents(),
+      "messages",
+      await page.locator("article.chat-message").count(),
+      "alerts",
+      await page.getByRole("alert").allTextContents(),
+    );
   }
   throw error;
 } finally {

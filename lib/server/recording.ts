@@ -10,14 +10,14 @@ export async function setRecording(
     .object({ recording: z.boolean(), key: z.uuid() })
     .parse(input);
   const db = await database();
-  await db.transaction(async (q) => {
+  return db.transaction(async (q) => {
     const state = await roomState(q, room, person, true);
     if (!recording) {
       await q(
         "update sahva.participants set recording_until=null,recording_key=null where id=$1 and room_id=$2 and recording_key=$3",
         [person, room, key],
       );
-      return;
+      return state;
     }
     if (!state.canRecord)
       throw new Problem(
@@ -39,5 +39,6 @@ export async function setRecording(
       "update sahva.participants set recording_until=now()+interval '30 seconds',recording_key=$2 where id=$1",
       [person, key],
     );
+    return state;
   });
 }

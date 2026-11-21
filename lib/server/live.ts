@@ -3,7 +3,7 @@ import WebSocket from "ws";
 import { z } from "zod";
 import { database, local } from "./db.ts";
 import { setRecording } from "./recording.ts";
-import { Problem, roomState } from "./rooms.ts";
+import { Problem } from "./rooms.ts";
 import { SarvamSpeech } from "../providers/sarvam.ts";
 import { upload } from "./turns.ts";
 import type { Language } from "../shared.ts";
@@ -83,10 +83,8 @@ export async function beginLive(room: string, person: string) {
       "LIVE_CONFIG",
       "Live captions need the speech provider. Use a recorded turn.",
     );
-  const db = await database();
-  const state = await roomState(db.query, room, person);
   const key = randomUUID();
-  await setRecording(room, person, { key, recording: true });
+  const state = await setRecording(room, person, { key, recording: true });
   const params = new URLSearchParams({
     model: "saaras:v4",
     language_code: state.me.speaking,

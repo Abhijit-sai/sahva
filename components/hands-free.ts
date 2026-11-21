@@ -43,8 +43,9 @@ export async function armHandsFree(
         return;
       }
       if (opening) {
-        // At most two seconds of audio may wait for the room microphone lease.
-        if (opening.length < 10) opening.push(frame);
+        // Preserve the onset through a cross-region room lease and provider handshake.
+        // Thirty 200 ms frames use at most 192 kB and never leave the device before authorization.
+        if (opening.length < 30) opening.push(frame);
         else opening = null;
         return;
       }

@@ -18,9 +18,9 @@ export async function openLiveMicrophone(
   let key: string | undefined, releaseInput: (() => void) | undefined;
   let stopped = false,
     disposed = false,
-    seq = 0,
-    queued = 0;
-  let tail = Promise.resolve();
+    seq = 0;
+  const pending: ArrayBuffer[] = [];
+  let sending: Promise<void> | null = null;
   let translating = false,
     lastTranslation = 0,
     lastText = "";
@@ -31,6 +31,7 @@ export async function openLiveMicrophone(
   };
   const cancel = () => {
     disposed = true;
+    pending.length = 0;
     stopped = true;
     release();
     if (key) void api(path + "finish", { key, cancel: true }).catch(() => {});
@@ -41,7 +42,7 @@ export async function openLiveMicrophone(
     stopped = true;
     release();
     try {
-      await tail;
+      await sending;
       if (disposed) return;
       const body = { key, capture: capture?.() };
       try {
@@ -66,49 +67,72 @@ export async function openLiveMicrophone(
       if (!disposed) onError(msg);
     });
   }
+  async function drain() {
+    while (pending.length && !disposed) {
+      // One 200 ms frame on fast links. Send two together when behind.
+      // 400 ms stays below the provider's 500 ms per-message limit.
+      const frames = pending.splice(0, 2);
+      const bytes = new Uint8Array(
+        frames.reduce((n, frame) => n + frame.byteLength, 0),
+      );
+      let offset = 0;
+      for (const frame of frames) {
+        bytes.set(new Uint8Array(frame), offset);
+        offset += frame.byteLength;
+      }
+      const audio = btoa(String.fromCharCode(...bytes));
+      const reply = await api<{ text: string; done: boolean }>(path + "frame", {
+        key,
+        seq: seq++,
+        audio,
+      });
+      if (disposed) return;
+      if (reply.text) {
+        onText(reply.text);
+        if (
+          !reply.done &&
+          !translating &&
+          lastText !== reply.text &&
+          performance.now() - lastTranslation >= 1800
+        ) {
+          translating = true;
+          lastText = reply.text;
+          lastTranslation = performance.now();
+          void api(path + "interpret", { key })
+            .catch(() => {})
+            .finally(() => {
+              translating = false;
+            });
+        }
+      }
+      if (reply.done) {
+        pending.length = 0;
+        void finish();
+        return;
+      }
+    }
+  }
   function sendFrame(frame: ArrayBuffer) {
     if (stopped || !key) return;
-    if (queued >= 12) {
+    if (pending.length >= 32) {
       fail(
-        Error("The microphone connection fell behind. Try a shorter phrase."),
+        Error(
+          "The microphone connection fell behind. Please check the saved phrase and repeat any missing words.",
+        ),
       );
       return;
     }
-    const audio = btoa(String.fromCharCode(...new Uint8Array(frame)));
-    const index = seq++;
-    queued++;
-    tail = tail
-      .then(async () => {
-        if (disposed) return;
-        const reply = await api<{ text: string; done: boolean }>(
-          path + "frame",
-          { key, seq: index, audio },
-        );
-        if (disposed) return;
-        if (reply.text) {
-          onText(reply.text);
-          if (
-            !reply.done &&
-            !translating &&
-            lastText !== reply.text &&
-            Date.now() - lastTranslation >= 1800
-          ) {
-            translating = true;
-            lastText = reply.text;
-            lastTranslation = Date.now();
-            void api(path + "interpret", { key })
-              .catch(() => {})
-              .finally(() => {
-                translating = false;
-              });
-          }
-        }
-        if (reply.done) queueMicrotask(() => void finish());
-      })
-      .catch(fail)
-      .finally(() => {
-        queued--;
-      });
+    pending.push(frame);
+    if (!sending)
+      sending = drain()
+        .catch((error) => {
+          pending.length = 0;
+          if (stopped) throw error;
+          fail(error);
+        })
+        .finally(() => {
+          sending = null;
+        });
   }
   try {
     if (!input)
