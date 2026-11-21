@@ -9,7 +9,7 @@
 
 ## Group meetings
 
-A server with LiveKit enabled offers **Group meeting** under **Room type**. Create the room, share its invitation, and have each guest choose a speaking and listening language. Once two people have joined, select **Join meeting audio** on each device. Up to six people can join. English and Telugu listeners see the same speaker’s message in their own language. **Original** opens its source recording and transcript. The roster stays beside the conversation on desktop.
+A server with LiveKit enabled offers **Group meeting** under **Room type**. Create the room, share its invitation, and have each guest choose a speaking and listening language. Once two people have joined, select **Join meeting audio** on each device. Up to six people can join. English, Telugu and Hindi listeners see the same speaker’s message in their own language. **Original** opens its source recording and transcript. The roster stays beside the conversation on desktop.
 
 The interpreter transcribes each participant’s microphone separately. Captions update during speech. Automatic playback uses archived audio or generated speech after a phrase becomes stable. Withdrawing consent stops interpretation for the room. Participants can consent again and reconnect their microphones. [Meeting setup and test](ops/LOCAL_DEVELOPMENT.md#livekit-group-meetings)
 

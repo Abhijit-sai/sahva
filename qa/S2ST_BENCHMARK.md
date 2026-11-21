@@ -266,3 +266,18 @@ Use scripts/meeting-smoke.mjs with a directory containing fictional english.wav,
 ### Approved substitute and release rehearsal
 
 The operator approved Sarvam Tarun after hearing the Telugu preview. When the private Sreekar service is absent or fails, a Hindi-enabled meeting renders Telugu with tarun_te_narration, and the recipient sees the actual voice name. Other directions retain the tested managed pipeline. Both Telugu deliveries reported Tarun and passed browser playback checks. Final local-server observations from source onset to the browser observing playback: English → Telugu 12.38 s, English → Hindi 11.72 s, Telugu → English 10.80 s, Telugu → Hindi 10.80 s, Hindi → Telugu 10.75 s, Hindi → English 11.83 s. These are individual fictional turns; the inputs themselves last several seconds. Use --trilingual without --telugu-captions to verify the release. Set SAHVA_SMOKE_TELUGU_VOICE=Sreekar only for a deliberate trial with a private service. Archive prior captions-only and Bulbul-control results as separate configurations.
+
+### Public release verification · c806285
+
+One Hindi, one English and one Telugu Chrome profile joined the same meeting at sahva.madsoul.in after the image and both private buckets were verified. All six translated captions matched their listener-specific timeline entries. Both Telugu deliveries reported tarun_te_narration; Hindi reported shubh_enhi_ads and English simran_en_customer. Web Audio playback began for every recipient, and every authorized translated WAV returned valid media. The call ended and produced one report item; the harness checked each returned evidence turn ID. Public preview bytes for Tarun and Shubh matched the release files.
+
+| Direction | Playback confirmed and listener timeline fetched, from source onset |
+| --- | ---: |
+| English → Telugu | 19.64 s |
+| English → Hindi | 20.08 s |
+| Telugu → English | 20.01 s |
+| Telugu → Hindi | 20.65 s |
+| Hindi → English | 20.17 s |
+| Hindi → Telugu | 21.11 s |
+
+Each time is an upper bound for playback start and includes the source phrase and a follow-up timeline fetch. The later console times of 22.08–23.24 s also include fetching the translated WAV again for verification. Neither measures last source speech to first sound on device. All six texts retained the prohibition on sending 15 and the correction to 12. Both Hindi-source outputs used containers as the shipment unit. A three-turn call cannot establish general accuracy or human listening latency.

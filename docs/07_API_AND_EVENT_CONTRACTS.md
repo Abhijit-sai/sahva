@@ -154,6 +154,6 @@ The offline MT runner requires the worker to echo the request UUID and language 
 
 The text-only engineering trial labels receipts `sourceKind=fictional-script`, records the exact input-text digest and uses a null PCM digest. Speaker-confirmed recordings require a PCM digest, verified references and processor consent. On CPU the worker returns `runtime.device=cpu`, `runtime.dtype=float32`, a null CUDA runtime and zero allocated GPU bytes.
 
-### Three-language meeting candidate
+### Three-language meeting delivery
 
 The LiveKit room snapshots the other members' listening languages when it saves a turn. Each delivery belongs to its source turn, correction revision and target language. Timeline and translated-media responses use the requesting member's listening preference. Group drafts are also listener-specific. Same-language recipients replay the original. A missing Sreekar service routes Telugu synthesis to Tarun. The delivery records the actual output voice so the UI and rehearsal can distinguish the two. The report language contract continues to offer English and Telugu.

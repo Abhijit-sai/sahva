@@ -164,3 +164,5 @@ LIVE-02 passed the four-phrase local provider test. LIVE-03 hardware and hosted 
 | G | GPU-10 / GPU-11 | Cost, capacity, privacy and explicit release decision |
 
 Ticket descriptions and operator steps are in the [research pack](Sahva_SelfHosted_Translation_Pack/docs/07_WBS_PHASE_PLAN.md).
+
+STREAM-01 group demo extension passed the three-person public rehearsal for English, Telugu and Hindi at c806285. The next evaluation items are conversational delay from the end of speech, Hindi shipment-unit fidelity, and repeated Sreekar listening and latency tests on approved compute. See the current project ledger for the release and benchmark references.

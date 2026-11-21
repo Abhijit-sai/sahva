@@ -101,7 +101,7 @@ Use official IndicProcessor with eng_Latn and tel_Telu. Private server transport
 
 The isolated service source is under services/indictrans2. Its Linux lock targets Python 3.11, Torch 2.6.0 / CUDA 12.4, Transformers 4.51.3 and IndicTransToolkit 1.1.1. On 21 November 2026 authenticated downloads verified both pinned revisions, including each safetensors SHA-256. Both directions generated text offline on CPU in FP32. The worker reports the selected device, thread count, dtype and beam count on each translation receipt. CPU timings apply to the tested hardware. CUDA execution, human comparison and room eligibility remain separate qualification steps.
 
-### Three-language LiveKit demo candidate
+### Released three-language LiveKit demo
 
 Group meetings accept English, Telugu and Hindi. Saaras v4 transcribes each microphone. Sarvam Translate v1 translates each utterance directly for each distinct listening language. English and Hindi use Bulbul v4 Flash. When a meeting includes a Hindi speaker or listener, Telugu speech is assigned to Maya 2 Native's Sreekar preset. The operator rejected both Pooja and Kavitha for the demo. Sreekar requires a reachable, authenticated private service. When Sreekar is unavailable the authorized substitute is Sarvam Tarun (tarun_te_narration). The listener sees the actual Telugu voice name. The existing two-person phrase flow and historical Mayura comparison keep their model configuration. Post-call reports remain available in English and Telugu.
 

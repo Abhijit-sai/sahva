@@ -210,3 +210,5 @@ aws ec2 wait instance-stopped --region "$GPU_REGION" --instance-ids "$GPU_INSTAN
 ```
 
 [EC2 stop/start lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html)
+
+For a three-language release rehearsal, confirm the active sahva-app image matches the intended release SHA and the public /api/ready endpoint succeeds. Run scripts/meeting-smoke.mjs with consented fictional English, Telugu and Hindi fixtures and --trilingual against the HTTPS origin. The normal rehearsal requires Tarun on both Telugu deliveries and browser playback on all six routes; the private Maya worker is optional. Preserve the actual voice name when comparing runs.

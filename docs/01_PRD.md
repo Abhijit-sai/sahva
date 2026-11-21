@@ -112,3 +112,7 @@ In hands-free mode, each participant activates once and can mute at any time. A 
 ## Internal stage comparison
 
 A tester can compare eligible translation stages against a common verified transcript, replay the corresponding private clip, inspect critical meaning errors and record a separate listening assessment. Speaking and listening languages remain the guest-facing controls. [Experimental scope](adr/0008_self_hosted_translation_eval.md)
+
+### Released group demo scope
+
+The opt-in LiveKit group room supports English, Telugu and Hindi in all six cross-language directions. For the Hindi-enabled demo, the accepted Telugu voice is Tarun on the managed service. Sreekar remains the preferred future private voice candidate. Meeting reports are available in English and Telugu. This extends the group demo beyond the original two-language phrase-call scope.
