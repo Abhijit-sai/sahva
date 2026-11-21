@@ -103,3 +103,7 @@ sahva/
 ## Implemented runtime
 
 The EC2 deployment, local persistence option and audio duration verification follow [ADR-0003](adr/0003_github_to_ec2.md). Production uses a private PostgreSQL schema and a single canonical JSONB meeting record with an immutable-by-version projection of Telugu display strings. Each source citation carries the turn and its transcript revision. Discrete awaited requests claim one speech stage at a time. Polling clients can continue an abandoned lease. An ended room remains available for playback and speaker corrections until access expiry.
+
+## Live phrase mode
+
+The expanded local demo adds a short-lived Sarvam PCM WebSocket, draft captions and phrase-boundary delivery alongside the recorded-turn route. It uses the same single-process room server, recording lease, storage and canonical report. [Accepted live interpreter decision](adr/0004_live_interpreter.md)

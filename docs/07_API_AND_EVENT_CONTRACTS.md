@@ -118,3 +118,7 @@ The timeline GET returns a bounded full snapshot (up to 60 turns), members, curr
 
 End freezes new turns. POST report/generate or report/retry is an awaited, leased operation. GET report returns version, status, skipped-turn count and items in the requested language. Items have kind, status, stable ID, owner, ownerParticipantId, deadline and revision-specific evidence. The Telugu projection can only replace the prose field. A post-end speaker correction invalidates the report and increments its version.
 
+
+## Live phrase extension
+
+Authenticated POSTs under the existing room API use the same CSRF header. `live/start` acquires the microphone lease, verifies consent and opens the server-side provider session. It returns a phrase key. `live/frame` accepts that key, a zero-based sequence and base64 mono signed 16-bit PCM at 16 kHz. Repeat frames are ignored and out-of-order frames are rejected. `live/interpret` coalesces translation requests for changing captions. The timeline's optional `caption` contains the current speaker, source text, draft translation, target language and final flag while both members consent. `live/finish` accepts the key and an optional cancel flag. It saves one original WAV and the final transcript when available. Repeated finishes return the saved turn. Drafts never enter the meeting record.

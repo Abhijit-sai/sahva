@@ -16,6 +16,7 @@ test("two consenting seats persist, third seat and unscoped access are refused",
   await second.getByRole("checkbox").check();
   await second.getByRole("button", { name: "Agree & join" }).click();
   await expect(page.getByText("Test guest", { exact: true })).toBeVisible();
+  await expect(second.getByText("Test guest (you)")).toBeVisible();
   await second.reload();
   await expect(second.getByText("Test guest (you)")).toBeVisible();
   const id = new URL(invite).pathname.split("/").pop();

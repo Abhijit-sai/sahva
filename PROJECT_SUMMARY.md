@@ -224,3 +224,26 @@ The workshop's existing Oregon CodeEditor is separate from this deployment. User
 - **Supabase.** In the correct operator account, create the Oregon project when deployment resumes. For the private workstation handoff, .env.oregon.local has fields for NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_POOLER_HOST and SUPABASE_DB_PASSWORD. Keep credentials out of chat, Git and browser assets. Verify the supplied project identity, TLS, four migration versions, both private buckets and a fresh two-turn test before directing a demo to Oregon. Existing Tokyo rooms and media require a separate scoped copy if continuity is requested. Leave the Tokyo project available. Do not use the signed-in Chrome profile for Supabase.
 - **Release and deployment.** GitHub Actions run 44879515775 for e566dc4 was in progress at last inspection. Check its final result and matching release before deployment. Follow ops/AWS_DEPLOYMENT.md for release installation, health check, rollback and the systemd timer. Record the running image SHA, public HTTPS URL, timed two-device smoke, and remaining demo limits here.
 - **Preserve** both local environments, audio, existing history and workshop resources. No deployment secrets, user recordings, invitation links or AWS federation credentials are stored in version control.
+
+---
+## [2026-11-21 13:17 IST] — LIVE-01 — Local real-time phrase interpretation — VERIFIED locally
+
+**Reporter:** Codex. **Checkout:** sahva_project_pack / main. **Starting HEAD:** 0c2f4bd. **Upstream:** origin/main. Clean initial tree. **Tickets:** LIVE-01, SB-03/04/05/06/07. Exact cutoff unknown.
+
+### User-visible result and implementation
+The user expanded the initial demo to real-time transcription and translation. Two participants can explicitly enable incoming voice, tap Speak live and see real source captions and provisional translations as the speaker talks. A natural pause submits the phrase and the other participant automatically hears the final translation. The original PCM recording remains available as WAV, and the final source transcript is bound to the attributed turn. Meeting intelligence uses the durable record. The manual recording flow remains available. The live panel shows the speaker and recipient languages. The timeline omits duplicate translated-text controls when the listener speaks the same language.
+
+Added public/live-pcm.js, components/live-{conversation,microphone}, lib/server/live.ts and scripts/live-room-smoke.mjs. Updated the room API, turn processing, end-room guard, workspace/entry/turn UI, CSS, Dockerfile, npm metadata and the existing browser reload test. Added ADR-0004 and docs/14_LIVE_DEMO_PHASES.md; updated PRD, acceptance, architecture, API, WBS, local runbook and README. No new DB migration. Keys and QA audio remain outside Git.
+
+### Test evidence
+| Check | Actual result |
+| --- | --- |
+| Direct paid Sarvam realtime WebSocket, synthetic speech | v4 emitted a partial about 0.98 s (English) and 0.91 s (Telugu) after connection start, then final text in both sessions. |
+| Final live Chrome test, two independent browser processes, synthetic microphones, real Sarvam/OpenAI, local persistence | Passed both directions, draft translations, pause submission, incoming auto-play, original WAVs, matching report languages, cross-speaker finish denial, active-mic end denial and consent withdrawal. |
+| Latest Telugu → English application timing | Speak click to first nonempty peer caption 3.44 s; click to peer draft 4.26 s; finish request to browser playback start 3.32 s. Captured original 10.6 s. |
+| Latest English → Telugu application timing | Speak click to first nonempty peer caption 2.37 s; click to peer draft 3.71 s; finish request to browser playback start 4.67 s. Captured original 8.2 s. |
+| Regression checks | Lint, TypeScript, 10 unit tests and production build passed. All 3 offline Chrome regressions passed in 17.9 s after synchronizing the guest reload with its completed join. An earlier live run failed its second auto-play assertion during development; two subsequent two-direction runs passed. |
+| Demo evidence | Local room on port 3018. Ignored screenshot .sahva/live-interpreter.png captures a live draft from synthetic test speech. Existing fallback videos show the recorded-turn workflow. |
+
+### Decisions, deployment and remaining work
+Single-process Node streaming relay, 16 kHz PCM, actual Sarvam interim events and rate-limited draft translations. LiveKit is deferred until a full-duplex transport requirement is proven. Progress: phases 1–3 exercised; phase 4 live phrase path verified locally. Phase 5 is continuous hands-free re-arming, interruption handling, reconnect and echo control. Phase 6 is two physical devices, fluent speaker review, measurements from the chosen host, a fresh live-mode backup recording and HTTPS deployment. The local synthetic tests do not measure time to a human ear, mobile behavior, conversational overlap or hosted latency. No AWS infrastructure or hosted Supabase settings were modified for LIVE-01. Inspect docs/14_LIVE_DEMO_PHASES.md and ops/LOCAL_DEVELOPMENT.md first to resume.

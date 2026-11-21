@@ -93,7 +93,7 @@ export function TurnCard({
           )}
         </details>
       )}
-      {turn.translated_text && (
+      {turn.translated_text && turn.source !== turn.target && (
         <details>
           <summary>Translated transcript · {languages[turn.target]}</summary>
           <p>{turn.translated_text}</p>

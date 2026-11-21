@@ -34,3 +34,7 @@ The optional full live browser test expects four consented MP4 samples in .sahva
 ## Hosted data
 
 Use the Project URL, server Secret key, PostgreSQL database URI and runtime keys described in [the AWS deployment runbook](AWS_DEPLOYMENT.md). Run `node --env-file=.env.local scripts/setup-supabase.ts` against the intended project. It verifies project binding, private buckets, migration checksums and table names. The cloud host uses the same script on deployment.
+
+## Two-browser live interpreter smoke
+
+Start the local app above. Run `node scripts/live-room-smoke.mjs .sahva/synthetic-inputs-EXAMPLE`, replacing the path with a directory containing synthetic telugu.wav and english.wav outputs from scripts/synthetic-speech-proof.ts. The smoke uses real Sarvam and OpenAI calls and creates one private QA room. It checks that the peer sees interim and draft text, that both original WAVs persist, that the translated voices play automatically, and that both report languages render. To select another local build, set SAHVA_SMOKE_ORIGIN. An HTTPS page or localhost is required for the AudioWorklet microphone.

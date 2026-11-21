@@ -71,3 +71,7 @@ Optional, **inside a real repo** with permission: install the published skill pa
 ## Buildathon success in one sentence
 
 A Telugu-speaking user and an English-speaking user join one browser room, exchange voice turns, each hears the other's words in their selected language, and leave with consistent summaries and evidence-linked action items in both languages.
+
+## Live interpreter demo
+
+Create a room in two browser profiles. For a reciprocal demo, choose English for both preferences in one profile and Telugu for both in the other. Both participants consent and select **Enable incoming voice**. Tap **Speak live**, speak a phrase and pause. The peer sees changing source captions and draft translation, then hears the finalized voice. Repeat from the other profile. The timeline and end-room report use the saved, attributed originals and final transcripts. See [the live delivery phases](docs/14_LIVE_DEMO_PHASES.md).

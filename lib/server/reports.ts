@@ -43,6 +43,12 @@ export async function endRoom(room: string, person: string) {
         "Only the room owner can end the conversation.",
       );
     if (state.room.status === "ended") return;
+    if (state.members.some((m) => m.recording))
+      throw new Problem(
+        409,
+        "MIC_BUSY",
+        "Finish the current phrase before ending the room.",
+      );
     const pending = await q(
       "select id from sahva.turns where room_id=$1 and stage<>'ready' and error is null limit 1",
       [room],

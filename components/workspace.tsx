@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useReducer, useState } from "react";
+import { LiveConversation, type Caption } from "./live-conversation";
 import { Entry } from "./entry";
 import { Report } from "./report";
 import { Recorder } from "./recorder";
@@ -19,6 +20,7 @@ type Snapshot = {
   me: Member;
   canRecord: boolean;
   turns: TurnView[];
+  caption: Caption | null;
 };
 export function Workspace({ id }: { id: string }) {
   const [invite, setInvite] = useState(""),
@@ -68,7 +70,7 @@ export function Workspace({ id }: { id: string }) {
       );
       const own = sessionStorage.getItem("invite-" + id);
       if (own) setShare(location.origin + "/room/" + id + "#invite=" + own);
-      timer = setTimeout(poll, document.hidden ? 5000 : 1500);
+      timer = setTimeout(poll, document.hidden ? 2500 : 650);
     }
     void poll();
     return () => {
@@ -89,7 +91,7 @@ export function Workspace({ id }: { id: string }) {
   return (
     <main>
       <p className="eyebrow">
-        Turn-based audio room · {active ? "Active" : "Ended"} ·{" "}
+        Interpreter room · {active ? "Active" : "Ended"} ·{" "}
         {Math.max(
           0,
           Math.floor(
@@ -140,7 +142,17 @@ export function Workspace({ id }: { id: string }) {
             </label>
           )}
           {state.canRecord && !connection ? (
-            <Recorder room={id} onUploaded={refresh} />
+            <>
+              <LiveConversation
+                room={id}
+                me={state.me}
+                peer={state.members.find((m) => m.id !== state.me.id)!}
+                caption={state.caption}
+                turns={state.turns}
+                refresh={refresh}
+              />
+              <Recorder room={id} onUploaded={refresh} />
+            </>
           ) : (
             <p>
               {connection

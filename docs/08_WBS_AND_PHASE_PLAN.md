@@ -97,3 +97,7 @@ At H4, if room upload is not working, **stop building summary UI**. At H7, if re
 
 ## Update protocol
 Change status here from `TODO` to `IN_PROGRESS` / `DONE` / `BLOCKED` only with associated phase-log evidence. Never mark deployed/QA complete based on code presence alone. If ticket boundaries change, record an ADR/decision and update dependencies.
+
+## Next buildathon demonstration
+
+After the original SB-00–08 foundation, LIVE-01 covers live source captions, draft translation and automatic phrase delivery. LIVE-02 covers hands-free conversation and interruptions. LIVE-03 covers physical-device acceptance and judge rehearsal. See [live delivery phases](14_LIVE_DEMO_PHASES.md).

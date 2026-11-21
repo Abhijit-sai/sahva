@@ -44,7 +44,12 @@ function requireConsent(canRecord: boolean) {
       "Recording requires two consenting participants in an active room.",
     );
 }
-export async function upload(room: string, person: string, form: FormData) {
+export async function upload(
+  room: string,
+  person: string,
+  form: FormData,
+  final?: { text: string; source: Language },
+) {
   const db = await database();
   requireConsent((await roomState(db.query, room, person)).canRecord);
   const idem = z.uuid().parse(form.get("idempotencyKey"));
@@ -92,8 +97,21 @@ export async function upload(room: string, person: string, form: FormData) {
     const target = state.members.find((m) => m.id !== person)!.listening;
     await save("room-original-audio", key, bytes, mime);
     await q(
-      "insert into sahva.turns(id,room_id,speaker_id,seq,idem,mime,duration_ms,original_key,target) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-      [id, room, person, seq, idem, mime, duration, key, target],
+      "insert into sahva.turns(id,room_id,speaker_id,seq,idem,mime,duration_ms,original_key,target,raw_text,source,stage) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+      [
+        id,
+        room,
+        person,
+        seq,
+        idem,
+        mime,
+        duration,
+        key,
+        target,
+        final?.text ?? null,
+        final?.source ?? null,
+        final ? "translation" : "stt",
+      ],
     );
     return { id, seq };
   });
@@ -285,6 +303,7 @@ export async function processStage(
           [id, t.revision, audioKey],
         );
     });
+    return next !== "ready";
   } catch (e) {
     await db.query(
       "update sahva.turns set error=$3,lease=null,lease_until=null where id=$1 and lease=$2",

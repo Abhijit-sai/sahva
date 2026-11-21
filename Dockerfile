@@ -13,6 +13,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/package.json /app/next.config.ts ./
+COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/supabase ./supabase
 COPY --from=build --chown=node:node /app/scripts/setup-supabase.ts ./scripts/setup-supabase.ts
 USER node

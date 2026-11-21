@@ -7,6 +7,14 @@ import {
   roomState,
 } from "../../../../../lib/server/rooms";
 import { database } from "../../../../../lib/server/db";
+import {
+  beginLive,
+  appendFrame,
+  interpretDraft,
+  finishLive,
+  liveCaption,
+  cancelRoomStream,
+} from "../../../../../lib/server/live";
 import { setRecording } from "../../../../../lib/server/recording";
 import { endRoom, generate, report } from "../../../../../lib/server/reports";
 import {
@@ -100,7 +108,11 @@ async function handle(req: NextRequest, context: Params) {
         "update sahva.participants set last_seen=now() where room_id=$1 and id=$2 and last_seen<now()-interval '5 seconds'",
         [id, participant],
       );
-      return json(await timeline(id, participant));
+      const snapshot = await timeline(id, participant);
+      return json({
+        ...snapshot,
+        caption: snapshot.canRecord ? liveCaption(id) : null,
+      });
     }
     if (post && action === "turns" && parts.length === 2) {
       if (Number(req.headers.get("content-length")) > 4_100_000)
@@ -114,12 +126,30 @@ async function handle(req: NextRequest, context: Params) {
         202,
       );
     }
+    if (post && action === "live" && parts.length === 3) {
+      if (parts[2] === "start") return json(await beginLive(id, participant));
+      if (parts[2] === "frame")
+        return json(
+          appendFrame(
+            id,
+            participant,
+            await (await boundedBody(req, 24000)).json(),
+          ),
+        );
+      if (parts[2] === "interpret") {
+        await interpretDraft(id, participant, await jsonInput(req));
+        return json({ ok: true });
+      }
+      if (parts[2] === "finish")
+        return json(await finishLive(id, participant, await jsonInput(req)));
+    }
     if (post && action === "recording" && parts.length === 2) {
       await setRecording(id, participant, await jsonInput(req));
       return json({ ok: true });
     }
     if (post && action === "end" && parts.length === 2) {
       await endRoom(id, participant);
+      cancelRoomStream(id);
       return json({ roomStatus: "ended" }, 202);
     }
     if (action === "report") {
@@ -159,9 +189,19 @@ async function handle(req: NextRequest, context: Params) {
     if (post && action === "turns" && parts.length === 4) {
       if (parts[3] === "revisions")
         await revise(id, participant, parts[2], await jsonInput(req));
-      else if (parts[3] === "process" || parts[3] === "retry")
-        await processStage(id, participant, parts[2], parts[3] === "retry");
-      else throw new Problem(404, "ROUTE", "Unknown turn operation.");
+      else if (parts[3] === "process" || parts[3] === "retry") {
+        for (let stage = 0; stage < 3; stage++) {
+          if (
+            !(await processStage(
+              id,
+              participant,
+              parts[2],
+              stage === 0 && parts[3] === "retry",
+            ))
+          )
+            break;
+        }
+      } else throw new Problem(404, "ROUTE", "Unknown turn operation.");
       return json({ ok: true });
     }
     if (!post && parts.length === 1) {
@@ -185,6 +225,13 @@ async function handle(req: NextRequest, context: Params) {
             "update sahva.participants set consented_at=case when $3 then now() end where room_id=$1 and id=$2",
             [id, participant, accepted],
           );
+          if (!accepted) {
+            cancelRoomStream(id);
+            await q(
+              "update sahva.participants set recording_until=null,recording_key=null where room_id=$1 and recording_key is not null",
+              [id],
+            );
+          }
           return roomState(q, id, participant);
         }),
       );

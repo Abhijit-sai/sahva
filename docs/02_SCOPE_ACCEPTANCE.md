@@ -57,3 +57,11 @@ Continuous streaming voice, open mic, echo suppression/ducking, barge-in, LiveKi
 **Voice AI for India:** Strong if same-recording base/system evaluation is implemented and honest.  
 **SaaS in a day:** Possible if a complete create→join→transact→report→return workflow is solid and a reference product/differentiation are documented.  
 **Personal context:** Could fit context/glossary but do not bend the story. Confirm organizer's official current rules before choosing.
+
+## Live demonstration extension (LIVE-01)
+
+- During a real Telugu phrase and an English reply, the peer sees changing source captions and a labeled translation draft before the archived turn appears.
+- A pause finishes the phrase and the listening participant hears an automatically played translation in their chosen language after enabling incoming audio.
+- Both original WAVs remain privately playable. The meeting record uses final source turns, and both localized reports link to evidence.
+- The other member cannot finish someone else's live phrase. Consent withdrawal invalidates the stream, and the owner must finish the active microphone phrase before ending the room.
+- Report microphone-button to first visible source and draft captions, plus finish-request to playback start. Include the device and provider conditions. Acoustic latency, overlapping speech and physical-device checks have separate gates in [the delivery plan](14_LIVE_DEMO_PHASES.md).

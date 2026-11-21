@@ -8,7 +8,7 @@ export function Entry({ id, invite }: { id?: string; invite?: string }) {
   return (
     <main className="entry">
       <div className="intro">
-        <p className="eyebrow">Turn-based audio room</p>
+        <p className="eyebrow">Telugu ↔ English · Voice room</p>
         <h1>
           {id
             ? "Join the conversation."
@@ -17,7 +17,7 @@ export function Entry({ id, invite }: { id?: string; invite?: string }) {
         <p>
           {id
             ? "Choose how you want to speak and listen."
-            : "Exchange voice turns in Telugu and English, then review what you agreed together."}
+            : "See live captions, hear each other in your language and take the meeting outcomes with you."}
         </p>
       </div>
       <form

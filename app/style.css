@@ -68,7 +68,7 @@ h3 {
 }
 h1 {
   font:
-    normal clamp(38px, 5.6vw, 82px)/1.04 Georgia,
+    normal clamp(38px, 5.6vw, 82px) / 1.04 Georgia,
     serif;
   letter-spacing: -0.055em;
 }
@@ -279,4 +279,44 @@ article form {
   .split[data-tab="conversation"] .room-panel {
     display: none;
   }
+}
+
+.live-box {
+  border-block: 1px solid var(--line);
+  padding: 20px 0;
+  margin-top: 16px;
+}
+.live-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.live-heading h3 {
+  font:
+    26px Georgia,
+    serif;
+  margin: 0;
+}
+.live-heading span {
+  color: var(--accent);
+  font-size: 13px;
+}
+.live-route {
+  margin: 8px 0 14px;
+  font-size: 15px;
+}
+.live-caption,
+.live-translation {
+  margin-top: 14px;
+  border-left: 3px solid var(--line);
+  padding: 4px 12px;
+  overflow-wrap: anywhere;
+}
+.live-translation {
+  border-color: var(--accent);
+}
+.live-caption p,
+.live-translation p {
+  margin: 4px 0 0;
 }
