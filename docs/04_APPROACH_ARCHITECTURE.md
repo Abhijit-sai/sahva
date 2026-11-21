@@ -1,0 +1,105 @@
+# Approach and Technical Architecture
+
+## Crucial architectural choice
+Sahva P0 is a **synchronous-feeling, turn-based voice room** built from short recorded utterances. It is *not* a continuously streaming, two-way audio track. This is deliberate: for a 12-hour build, making the entire record/translate/playback/report loop reliable matters more than low-latency simultaneous interpretation. See ADR-0001.
+
+## P0 architecture (preferred)
+
+```mermaid
+flowchart TD
+  A[Browser A: Telugu] -->|25s turn, consent| API[Next.js server API]
+  B[Browser B: English] -->|join/poll/turns| API
+  API --> DB[(Supabase Postgres)]
+  API --> ST[(Private Storage)]
+  API --> JOB[Turn pipeline orchestration]
+  JOB --> ASR[Sarvam Saaras v4]
+  ASR --> TR[Sarvam Mayura v1]
+  TR --> TTS[Sarvam Bulbul v4 Flash]
+  JOB --> DB
+  TTS --> ST
+  DB -->|poll updates 1-2 seconds| A
+  DB -->|poll updates 1-2 seconds| B
+  API --> SUM[LLM structured report]
+  SUM --> DB
+```
+
+## P0 transports and delivery
+- **No LiveKit dependency is required** to deliver the turn-based room. Two browsers join through server-issued participant tokens; state and recordings are persisted in Supabase; browser polls `GET /api/rooms/:id/timeline` every 1–2 seconds (easy to debug/deploy). Polling is a performance compromise, not simultaneous streaming.
+- A room token is signed on the server, scoped to one room and participant, and expires. Never use a mere numeric room ID for authorization.
+- Optional Supabase Realtime for turn updates only after core behavior works. A managed LiveKit room is a P2 step for truly open-mic, full-duplex voice. Do **not** install it out of habit; that adds tokens, track routing, noise, echo and permission issues today.
+- Long-running provider work: initiate one request after upload; on a platform with short serverless time limits, use Supabase Edge Functions or an appropriate queued worker. Avoid fire-and-forget promises from an ephemeral handler. Validate end-to-end worker execution in the selected deployment before starting the main build.
+
+## Core modules (deep and independently testable)
+1. `RoomService`: create, join, authorize, consent, presence, end; owns room invariants.
+2. `TurnService`: validate clip/participant, store source, enforce duration and idempotency, manage state.
+3. `SpeechPipeline`: ASR → translation by target language → TTS and persistence, retries and stage timings. All vendor calls behind interfaces.
+4. `TimelineProjection`: join turns, source transcript/revisions and recipient deliveries into one permissioned view.
+5. `MeetingIntelligence`: typed extraction of canonical facts with source turn IDs and conservative certainty statuses; rejects unsupported claims.
+6. `ReportLocalization`: translates only human-language prose, never IDs, statuses, owner keys, dates or evidence relationships.
+7. `AudioAccessService`: private object keys, authorized signed download URLs, purge.
+
+## Provider ports
+`Transcribe(audio,keyterms?) -> {text,language,providerRequestId}`  
+`Translate(text,sourceLanguage,targetLanguage,context?) -> {text,providerRequestId}`  
+`Synthesize(text,language,voice) -> {audioBytes,mimeType,providerRequestId}`  
+`ExtractMeetingRecord(turns,meetingMetadata) -> CanonicalMeetingRecord`  
+`LocalizeMeetingRecord(canonical,language) -> LocalizedProjection`.
+
+Explicit versioned types and validators prevent leaking external provider response shapes into React components or domain models. Test with stubs.
+
+## One-turn processing order
+1. Client obtains microphone consent and records local clip with visible timer.
+2. Client submits blob and `idempotencyKey`. Server validates membership, MIME/duration/size, room status and consent.
+3. Save original audio to private storage and create `turn` row `uploaded` before invoking external models.
+4. Run ASR; save raw output `source_transcript` and recognized language. Errors are stage-specific.
+5. For each unique other-party preferred language, translate (or bypass if same language).
+6. Run TTS for translated text; decode base64 response to audio bytes; persist private media object.
+7. Update delivery status; polling client sees result and signed playback URLs. No unconditional autoplay assumption.
+8. On speaker correction, store a new revision, invalidate affected translations/report, re-run only dependent stages; never erase original audio.
+
+## Report flow
+1. Room ends; gather all ready turns and latest approved revisions, keeping original ASR and turn IDs separately.
+2. LLM returns schema-validated JSON with summary; `decisions`, `actions`, `unresolvedQuestions`; exact source `turnId` arrays; canonical event status.
+3. Post-validator rejects evidence IDs not in the room and items with an owner/date unsupported by available statements (automated semantic enforcement is imperfect; require conservative prompts and manual review for high-stakes terms).
+4. Persist canonical record exactly once, with generation version and source revision hashes.
+5. Render English or Telugu translations as separate projections; keep entity IDs and structured fields identical.
+
+## Security and error boundaries
+- Browser → server: session cookie/room token, validated server-side. Keys never exposed.
+- Server → Sarvam/LLM: keys injected via environment; bounded request size and timeout.
+- Server → Storage: service identity; browser only receives short-lived signed URLs for objects associated with its room.
+- Persist stage failure type and retry count; retry only idempotent operations, backoff on 429/5xx. No infinite retries.
+- Separate room join from consent; participant list and recording disclosure always visible.
+
+## Explicitly rejected alternatives for P0
+| Alternative | Why rejected today | Revisit |
+|---|---|---|
+| Full LiveKit WebRTC audio calling + track translation | Highest risk of raw/translated overlap and routing | After turn pipeline is stable |
+| OpenAI realtime translation only | Telugu translated speech output coverage not guaranteed for our target; needs verification | Later provider comparison |
+| WhatsApp group bot | Account eligibility and messaging permissions can block demo | Post-event |
+| Pure client→provider calls | Leaks API key and weakens authorization/storage control | Never |
+| Entire transcript as direct context | No provenance, invented agreements and context window growth | Never without typed evidence extraction |
+| Separate report generation per language | Divergent 'facts' between participants | Never |
+| Overengineered queue + microservices | Time cost without demo value | Scale phase |
+
+## Suggested repo skeleton
+```
+sahva/
+  app/                  # Next.js routes, pages, React UI
+  app/api/              # server endpoints, auth and handlers
+  components/room/      # room controls, audio cards, report
+  lib/domain/           # schemas, room/turn/report invariants
+  lib/providers/        # sarvam adapters, LLM adapter
+  lib/server/           # auth, storage, repositories, orchestration
+  lib/shared/           # API DTOs and language constants
+  supabase/migrations/  # versioned SQL, RLS if client access is used
+  tests/                # contract and end-to-end smoke tests
+  fixtures/             # consented synthetic/test audio only
+  docs/                 # these docs; do not duplicate sources
+  AGENTS.md
+  PROJECT_SUMMARY.md
+```
+
+## Implemented runtime
+
+The EC2 deployment, local persistence option and audio duration verification follow [ADR-0003](adr/0003_github_to_ec2.md). Production uses a private PostgreSQL schema and a single canonical JSONB meeting record with an immutable-by-version projection of Telugu display strings. Each source citation carries the turn and its transcript revision. Discrete awaited requests claim one speech stage at a time. Polling clients can continue an abandoned lease. An ended room remains available for playback and speaker corrections until access expiry.

@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.vercel/
+.sahva/
+test-results/
+playwright-report/
+*.tsbuildinfo
+next-env.d.ts
+*.wav
+*.webm
+*.ogg
+*.mp3
+*.m4a
+*.mp4
+.next-e2e/

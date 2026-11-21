@@ -1,0 +1,166 @@
+import { Buffer } from "node:buffer";
+import { z } from "zod";
+
+const language = z.enum(["te-IN", "en-IN"]);
+export type Language = z.infer<typeof language>;
+export type Stage = "stt" | "translation" | "tts";
+
+const receipt = z.object({
+  request_id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+});
+const transcription = receipt.extend({
+  transcript: z.string(),
+  language_code: z.string().nullable(),
+});
+const translation = receipt.extend({
+  translated_text: z.string().trim().min(1),
+  source_language_code: language,
+});
+const speech = receipt.extend({
+  audios: z.tuple([z.base64().max(10_000_000)]),
+});
+const voices = {
+  "en-IN": "simran_en_customer",
+  "te-IN": "pooja_te_conversation",
+};
+
+export class SpeechError extends Error {
+  readonly stage: Stage;
+  readonly code: string;
+
+  constructor(stage: Stage, code: string) {
+    super(stage + ": " + code);
+    this.stage = stage;
+    this.code = code;
+  }
+}
+
+export class SarvamSpeech {
+  #key: string;
+  #send: typeof fetch;
+
+  constructor(key: string, send: typeof fetch = fetch) {
+    if (!key.trim()) throw new Error("SARVAM_API_KEY is required");
+    this.#key = key;
+    this.#send = send;
+  }
+
+  async #post<T>(
+    stage: Stage,
+    path: string,
+    body: FormData | Record<string, string>,
+    schema: z.ZodType<T>,
+  ) {
+    const headers = new Headers({ "api-subscription-key": this.#key });
+    const multipart = body instanceof FormData;
+    if (!multipart) headers.set("Content-Type", "application/json");
+    const start = performance.now();
+    const signal = AbortSignal.timeout(20_000);
+    try {
+      const response = await this.#send("https://api.sarvam.ai/" + path, {
+        method: "POST",
+        redirect: "error",
+        cache: "no-store",
+        headers,
+        signal,
+        body: multipart ? body : JSON.stringify(body),
+      });
+      if (!response.ok) throw new SpeechError(stage, "HTTP_" + response.status);
+      const parsed = schema.safeParse(await response.json());
+      if (!parsed.success) throw new SpeechError(stage, "INVALID_RESPONSE");
+      return {
+        data: parsed.data,
+        elapsedMs: Math.round(performance.now() - start),
+      };
+    } catch (error) {
+      if (error instanceof SpeechError) throw error;
+      throw new SpeechError(
+        stage,
+        signal.aborted
+          ? "TIMEOUT"
+          : error instanceof SyntaxError
+            ? "INVALID_RESPONSE"
+            : "CONNECTION_FAILED",
+      );
+    }
+  }
+
+  async transcribe(file: File) {
+    const form = new FormData();
+    form.set("file", file);
+    form.set("model", "saaras:v4");
+    form.set("mode", "transcribe");
+    form.set("language_code", "unknown");
+    const { data, elapsedMs } = await this.#post(
+      "stt",
+      "speech-to-text",
+      form,
+      transcription,
+    );
+    const text = data.transcript.trim();
+    if (!text) throw new SpeechError("stt", "NO_SPEECH");
+    const recognized = language.safeParse(data.language_code);
+    if (!recognized.success)
+      throw new SpeechError("stt", "UNSUPPORTED_LANGUAGE");
+    return {
+      text,
+      language: recognized.data,
+      requestId: data.request_id,
+      elapsedMs,
+    };
+  }
+
+  async translate(text: string, source: Language, target: Language) {
+    if (!text.trim() || Array.from(text).length > 1000)
+      throw new SpeechError("translation", "TEXT_LENGTH");
+    const { data, elapsedMs } = await this.#post(
+      "translation",
+      "translate",
+      {
+        model: "mayura:v1",
+        input: text,
+        source_language_code: source,
+        target_language_code: target,
+      },
+      translation,
+    );
+    if (data.source_language_code !== source)
+      throw new SpeechError("translation", "LANGUAGE_MISMATCH");
+    return {
+      text: data.translated_text,
+      requestId: data.request_id,
+      elapsedMs,
+    };
+  }
+
+  async synthesize(text: string, target: Language) {
+    if (!text.trim() || Array.from(text).length > 2500)
+      throw new SpeechError("tts", "TEXT_LENGTH");
+    const { data, elapsedMs } = await this.#post(
+      "tts",
+      "text-to-speech",
+      {
+        model: "bulbul:v4-flash",
+        speaker: voices[target],
+        text,
+        language_code: target,
+        output_audio_codec: "wav",
+      },
+      speech,
+    );
+    const audio = Buffer.from(data.audios[0], "base64");
+    if (
+      audio.length <= 44 ||
+      audio.toString("ascii", 0, 4) !== "RIFF" ||
+      audio.toString("ascii", 8, 12) !== "WAVE"
+    ) {
+      throw new SpeechError("tts", "INVALID_WAV");
+    }
+    return {
+      audio,
+      speaker: voices[target],
+      requestId: data.request_id,
+      elapsedMs,
+    };
+  }
+}

@@ -1,0 +1,12 @@
+node_modules
+.next*
+.sahva
+.env*
+.git
+test-results
+playwright-report
+*.tsbuildinfo
+**/*.wav
+**/*.mp4
+**/*.webm
+

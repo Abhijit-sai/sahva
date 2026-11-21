@@ -1,0 +1,9 @@
+[Unit]
+Description=Install the latest tested Sahva release
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sahva-update
+TimeoutStartSec=15min

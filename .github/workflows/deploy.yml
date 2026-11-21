@@ -1,0 +1,59 @@
+name: Test and publish Sahva
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: sahva-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint && npm run typecheck && npm test
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+        env:
+          PLAYWRIGHT_CHANNEL: chromium
+      - run: npm run build
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release image and smoke test it
+        run: |
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" --label org.opencontainers.image.source=https://github.com/Abhijit-sai/sahva -t "sahva:$GITHUB_SHA" .
+          docker run --rm "sahva:$GITHUB_SHA" ffmpeg -version
+          docker run -d --name check -p 127.0.0.1:3000:3000 "sahva:$GITHUB_SHA"
+          curl --fail --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health
+          docker stop check
+          docker save "sahva:$GITHUB_SHA" | gzip -1 > sahva-linux-amd64.tar.gz
+          sha256sum sahva-linux-amd64.tar.gz > SHA256SUMS
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "build-$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "This commit already has a release."
+          else
+            gh release create "build-$GITHUB_SHA" sahva-linux-amd64.tar.gz SHA256SUMS --target "$GITHUB_SHA" --title "Sahva ${GITHUB_SHA:0:10}" --notes "Tested Linux x86-64 image. The commit is the deployment version." --latest
+          fi
+

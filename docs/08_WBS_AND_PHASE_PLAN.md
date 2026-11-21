@@ -1,0 +1,99 @@
+# Work Breakdown Structure — 12-Hour Buildathon
+
+**Method:** Matt Pocock-style vertical tracer bullets: each ticket should leave a feature demonstrable through UI/API/storage rather than deliver a standalone layer. This local file is the single ticket tracker until migrated to real issues. Update status **here**, but record factual completion evidence and handoff in `PROJECT_SUMMARY.md`.
+
+## Implementation checkpoints — 2026-11-21
+
+| Ticket | Observed state |
+| --- | --- |
+| SB-00 | Both directions returned decoded audio from Sarvam with supplied recordings. Native-speaker quality review pending. |
+| SB-01 | Two isolated Chrome sessions verified locally, including third-seat denial and withdrawal. |
+| SB-02 | Private original replay after refresh and provider failure verified locally. |
+| SB-03/04 | Four consented recordings through both directions with two Chrome sessions. Two physical devices pending. |
+| SB-05/06 | Live canonical extraction and matched Telugu display tested on four source transcripts. See phase ledger for latest browser gate. |
+| SB-08 | Live speaker revision reprocessed with original ASR preserved. |
+| SB-07 | GitHub → existing EC2 release workflow under verification. Consult the latest ledger entry for deployment state. |
+
+The ticket descriptions below preserve baseline dependencies and original estimates.
+
+## Dependencies
+
+```mermaid
+flowchart LR
+ T00[SB-00 Provider proof] --> T01[SB-01 One room + 2 users]
+ T01 --> T02[SB-02 Original voice turn]
+ T02 --> T03[SB-03 Telugu to English voice]
+ T03 --> T04[SB-04 English to Telugu + timeline]
+ T04 --> T05[SB-05 End + shared report]
+ T05 --> T06[SB-06 Localize + evidence]
+ T06 --> T07[SB-07 QA + deploy]
+ T04 --> T08[SB-08 Correct transcript]
+ T08 --> T07
+```
+
+## Tickets
+
+### SB-00 — Provider and environment proof | H0–1 | P0 | Status: TODO | Blocks all
+**Build:** Local/HTTPS server-only smoke endpoint or script exercises real Sarvam STT, Mayura and Bulbul for both directions. Check actual environment credential injection, media codec and latency.  
+**Demo/test:** Play 2 real translations with 2 original source clips; note rate/limit errors and provider request IDs.  
+**Done:** Test evidence in phase log; choice of recorder MIME and voices confirmed. No provider failure silently ignored.
+
+### SB-01 — Two users in one consented room | H1–2.5 | P0 | Blocked by SB-00
+**Build:** Room create, invite join, authorized owner/guest, per-user language, consent display, room 2-seat enforcement, presence polling.  
+**Demo/test:** Two browser profiles can join; a third receives room-full message; no recording before consent.  
+**Done:** Persistence across refresh and valid authorization checks.
+
+### SB-02 — One original audio turn, saved and replayable | H2.5–4 | P0 | Blocked by SB-01
+**Build:** 25s MediaRecorder flow, upload endpoint, idempotency, private storage, time-sequenced timeline card, source audio replay.  
+**Demo/test:** Speak once on A, replay the original on B after refresh; no duplication on retry.  
+**Done:** Source remains available after failed downstream processing.
+
+### SB-03 — Telugu→English processing | H4–5.5 | P0 | Blocked by SB-02
+**Build:** ASR→MT→TTS adapters, secure background/awaited orchestration, status feedback, per-stage errors.  
+**Demo/test:** A speaks Telugu, B sees English text and plays synthesized English voice.  
+**Done:** Real API integration, real audio, not a canned response.
+
+### SB-04 — Bidirectional and durable shared conversation | H5.5–7 | P0 | Blocked by SB-03
+**Build:** Reverse English→Telugu, alternate turns, timeline polling, source and translation controls, hide/show transcript, playback state.  
+**Demo/test:** Four fresh turns across two devices, source+translation accessible.  
+**Done:** No raw/translated overlapping microphone stream or stuck auto-play.
+
+### SB-05 — Canonical report from conversation | H7–8.5 | P0 | Blocked by SB-04
+**Build:** End room, schema-constrained LLM extraction, summary/decisions/actions/unresolved, status and evidence ID validation, report persistence.  
+**Demo/test:** End a real call; reports propose no unsupported owner/date and include evidence-linked action.  
+**Done:** Report idempotent; AI errors don't fabricate commitments.
+
+### SB-06 — Localized report and evidence jump | H8.5–9.5 | P0 | Blocked by SB-05
+**Build:** Render English/Telugu versions of same canonical record. Source action ID/citation jumps to original turn.  
+**Demo/test:** Switch language without changing IDs/status/owners/dates; click action to view source.  
+**Done:** Comparison script checks projection invariants.
+
+### SB-08 — Transcript revision (small slice) | H9.5–10.25 | P0 | Blocked by SB-04
+**Build:** Revision form, history, dependent output invalidation/reprocess with concurrency guard.  
+**Demo/test:** Fix product name, see new translation, original ASR/audio preserved.  
+**Done:** No silent destructive overwrite. If squeezed, preserve correction and disable auto-reprocess with visible notice; record incomplete AC-15.
+
+### SB-07 — QA, deployed proof and pitch | H10.25–12 | P0 | Blocked by SB-06 (and SB-08 if accepted)
+**Build:** Browser/device matrix, adversarial fixtures, visual cleanup, provider cost guard, HTTPS deploy, 3-minute demo video.  
+**Demo/test:** Fresh two-device Telugu/English conversation, end, report and source evidence; real latency observed.  
+**Done:** Release gate sheet checked with evidence; limitations declared.
+
+## P1 extension tickets (DO NOT START until P0 gates pass)
+- SB-09: glossary term approval → ASR v4 `keyterms` → improved future turn.
+- SB-10: item confirmation/rejection → status transitions with participant sign-off.
+- SB-11: transparent same-recording baseline/system evaluation screen, with source-audio fixtures and human truth labels.
+- SB-12: copy/export localized Markdown meeting notes.
+
+## Time protection and priority cuts
+At H4, if room upload is not working, **stop building summary UI**. At H7, if reverse translation is not working, concentrate on it. At H9.5, if report needs work, cut glossary and export, not evidence. At H11, freeze features and test/deploy. If recorder or vendor fails irrecoverably, fallback to voice-note upload in a room with translation+report and truthfully describe this reduced scope.
+
+## Definition of done per ticket
+- Functional behavior demonstrated at the highest reasonable seam.
+- Test(s) added for domain invariants; typecheck/lint where configured.
+- Errors/states/unauthorized path exercised.
+- Real external dependency smoke-tested when applicable.
+- Existing diff inspected; only ticket-related changes.
+- `PROJECT_SUMMARY.md` appended with exact artifacts, tests, defects and next step.
+
+## Update protocol
+Change status here from `TODO` to `IN_PROGRESS` / `DONE` / `BLOCKED` only with associated phase-log evidence. Never mark deployed/QA complete based on code presence alone. If ticket boundaries change, record an ADR/decision and update dependencies.
