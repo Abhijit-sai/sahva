@@ -6,7 +6,7 @@ import { setRecording } from "./recording.ts";
 import { Problem } from "./rooms.ts";
 import { SarvamSpeech } from "../providers/sarvam.ts";
 import { upload } from "./turns.ts";
-import type { Language } from "../shared.ts";
+import { otherLanguage, type Language } from "../shared.ts";
 
 import { serverTime, type TurnTiming } from "../rehearsal.ts";
 
@@ -36,37 +36,38 @@ const holder = globalThis as typeof globalThis & {
 const streams = (holder.sahvaStreams ??= new Map());
 const frame = z.object({
   key: z.uuid(),
-  seq: z.int().min(0).max(150),
+  seq: z.int().min(0).max(260),
   audio: z.base64().min(4).max(22000),
 });
 const caption = z.object({
   event: z.enum(["transcript.partial", "transcript.final"]),
   text: z.string().trim().min(1).max(4000),
 });
+const streamId = (room: string, person: string) => room + "/" + person;
 function dispose(s: Session) {
-  if (streams.get(s.room) === s) streams.delete(s.room);
+  const id = streamId(s.room, s.person);
+  if (streams.get(id) === s) streams.delete(id);
   clearTimeout(s.timer);
   if (s.socket.readyState !== WebSocket.CLOSED) s.socket.terminate();
 }
 export function cancelRoomStream(room: string) {
-  const s = streams.get(room);
-  if (s) dispose(s);
+  for (const s of streams.values()) if (s.room === room) dispose(s);
 }
-export function liveCaption(room: string) {
-  const s = streams.get(room);
-  return s
-    ? {
-        speaker: s.person,
-        interimAt: s.timing.interim,
-        text: s.text,
-        translated: s.translated,
-        target: s.target,
-        final: s.final,
-      }
-    : null;
+export function liveCaptions(room: string) {
+  return Array.from(streams.values())
+    .filter((s) => s.room === room)
+    .map((s) => ({
+      key: s.key,
+      speaker: s.person,
+      interimAt: s.timing.interim,
+      text: s.text,
+      translated: s.translated,
+      target: s.target,
+      final: s.final,
+    }));
 }
 function owned(room: string, person: string, key: string) {
-  const s = streams.get(room);
+  const s = streams.get(streamId(room, person));
   if (!s || s.person !== person || s.key !== key)
     throw new Problem(
       409,
@@ -75,7 +76,12 @@ function owned(room: string, person: string, key: string) {
     );
   return s;
 }
-export async function beginLive(room: string, person: string) {
+export async function beginLive(
+  room: string,
+  person: string,
+  transport: "phrase" | "livekit" = "phrase",
+  epoch?: number,
+) {
   const apiKey = process.env.SARVAM_API_KEY;
   if (!apiKey || (local() && process.env.SAHVA_OFFLINE_TEST === "1"))
     throw new Problem(
@@ -84,7 +90,13 @@ export async function beginLive(room: string, person: string) {
       "Live captions need the speech provider. Use a recorded turn.",
     );
   const key = randomUUID();
-  const state = await setRecording(room, person, { key, recording: true });
+  const state = await setRecording(
+    room,
+    person,
+    { key, recording: true },
+    transport,
+    epoch,
+  );
   const params = new URLSearchParams({
     model: "saaras:v4",
     language_code: state.me.speaking,
@@ -102,14 +114,17 @@ export async function beginLive(room: string, person: string) {
       maxPayload: 65536,
     },
   );
-  const old = streams.get(room);
+  const old = streams.get(streamId(room, person));
   if (old) dispose(old);
   const s: Session = {
     room,
     person,
     key,
     language: state.me.speaking,
-    target: state.members.find((m) => m.id !== person)!.listening,
+    target:
+      transport === "livekit"
+        ? otherLanguage(state.me.speaking)
+        : state.members.find((m) => m.id !== person)!.listening,
     timing: {},
     translated: "",
     lastAttempt: 0,
@@ -123,7 +138,7 @@ export async function beginLive(room: string, person: string) {
     failed: false,
     timer: setTimeout(() => dispose(s), 35000),
   };
-  streams.set(room, s);
+  streams.set(streamId(room, person), s);
   socket.on("error", () => {
     s.failed = true;
   });
@@ -154,7 +169,7 @@ export async function beginLive(room: string, person: string) {
       socket.once("error", reject);
       socket.once("close", () => reject(new Error("closed")));
     });
-    if (streams.get(room) !== s) throw Error("expired");
+    if (streams.get(streamId(room, person)) !== s) throw Error("expired");
     return { key };
   } catch {
     dispose(s);
@@ -193,7 +208,7 @@ export async function interpretDraft(
     const result = await new SarvamSpeech(
       process.env.SARVAM_API_KEY!,
     ).translate(text, s.language, s.target);
-    if (streams.get(room) === s) s.translated = result.text;
+    if (streams.get(streamId(room, person)) === s) s.translated = result.text;
   } catch {
     /* The durable turn retries translation independently after the phrase. */
   } finally {
@@ -243,10 +258,11 @@ function wave(samples: Buffer, rate = 16000) {
   return Buffer.concat([h, samples]);
 }
 export async function finishLive(room: string, person: string, input: unknown) {
-  const { key, cancel, capture } = z
+  const { key, cancel, capture, voice } = z
     .object({
       key: z.uuid(),
       cancel: z.boolean().default(false),
+      voice: z.string().max(64).optional(),
       capture: z
         .object({
           onset: z.int().positive(),
@@ -257,7 +273,7 @@ export async function finishLive(room: string, person: string, input: unknown) {
         .catch(undefined),
     })
     .parse(input);
-  const s = streams.get(room);
+  const s = streams.get(streamId(room, person));
   if (!s || s.key !== key || s.person !== person) {
     if (!cancel) {
       const db = await database();
@@ -289,6 +305,7 @@ export async function finishLive(room: string, person: string, input: unknown) {
     "phrase.wav",
   );
   form.set("idempotencyKey", key);
+  if (voice !== undefined) form.set("voice", voice);
   const now = serverTime();
   if (
     capture &&

@@ -2,7 +2,7 @@
 
 ## Release compatibility
 
-Migrations 001–004 define the room, seats, recording lease, turns, revisions, deliveries and canonical reports. Timing diagnostics can use optional numeric fields in the existing turn timings JSON plus listener-local playback observations. Missing fields on older or manual turns mean unobserved. Keep measurements out of report prompts. A future voice preference needs an additive participant default and a snapshot on the attributed turn so retries use the same voice. Document and test any migration with pre-existing rooms before deployment. Experimental stream generations and queues are ephemeral. Only committed attributed turns become report evidence.
+Migrations 001–004 define the room, seats, recording lease, turns, revisions, deliveries and canonical reports. Timing diagnostics can use optional numeric fields in the existing turn timings JSON plus listener-local playback observations. Missing fields on older or manual turns mean unobserved. Keep measurements out of report prompts. VOICE-01 scopes the speaker’s preferred persona by room, participant and target language in the guest browser. The selection persists across reloads of that guest session. The server validates the persona against the actual listener language and snapshots it in the turn’s existing JSON metadata under synthesis.speaker. Retries and transcript corrections use the stored selection. Older turns resolve the existing language default. Cross-device guest transfer would require a server-side preference migration. This slice requires no DDL. Document and test any migration with pre-existing rooms before deployment. Experimental stream generations and queues are ephemeral. Only committed attributed turns become report evidence.
 
 This is a **logical schema proposal**, not proof of migrated database tables. Start with the smallest executable migrations and extend via ADRs. The service layer, not UI state, owns validation and authorization.
 
@@ -83,3 +83,7 @@ For buildathon prototype, choose a documented short retention window (proposal: 
 
 ## Transaction and isolation strategy
 Use server-only Supabase service role and authorize all queries by participant-room token. Never expose direct public table selects with service role. Optional RLS if client database access introduced; migration tests required. For concurrent joins/turns, enforce limits in database transactions and unique indexes rather than memory flags.
+
+### LiveKit group meetings
+
+Migration 005 adds rooms.transport and rooms.media_epoch. Existing rooms default to phrase. Group seats range from 1 to 6. Room creation and invitation joins serialize seat assignment under the room lock. Consent withdrawal increments the media epoch. A stable phrase key links a live caption and its durable turn. English and Telugu deliveries share one source turn and its canonical evidence.

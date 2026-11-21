@@ -5,6 +5,9 @@ export async function GET() {
     if (
       process.env.NODE_ENV === "production" &&
       [
+        ...(process.env.SAHVA_LIVEKIT === "1"
+          ? ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"]
+          : []),
         "DATABASE_URL",
         "SARVAM_API_KEY",
         "OPENAI_API_KEY",
@@ -15,7 +18,9 @@ export async function GET() {
     )
       throw new Error("Incomplete runtime configuration");
     const db = await database();
-    await db.query("select 1 from sahva.meeting_records limit 0");
+    await db.query(
+      "select r.transport,r.media_epoch from sahva.rooms r, sahva.meeting_records m limit 0",
+    );
     return Response.json(
       { ready: true },
       { headers: { "Cache-Control": "no-store" } },

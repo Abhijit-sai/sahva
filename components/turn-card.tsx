@@ -9,6 +9,7 @@ export type TurnView = {
   generated_at?: number | null;
   transcribed_at?: number | null;
   id: string;
+  phrase_id?: string;
   seq: number;
   speaker_id: string;
   duration_ms: number;
@@ -73,12 +74,13 @@ export function TurnCard({
           · {(turn.duration_ms / 1000).toFixed(1)}s
         </small>
       </div>
-      {turn.stage !== "ready" && (
-        <p className="status" role="status">
-          {turn.error ? "Needs attention · " : ""}
-          {stages[turn.stage]}…
-        </p>
-      )}
+      {turn.stage !== "ready" &&
+        (own || !turn.current_text || turn.target !== turn.source) && (
+          <p className="status" role="status">
+            {turn.error ? "Needs attention · " : ""}
+            {stages[turn.stage]}…
+          </p>
+        )}
       <div className="voice-message">
         {(own || turn.voice || turn.source === turn.target) && (
           <audio

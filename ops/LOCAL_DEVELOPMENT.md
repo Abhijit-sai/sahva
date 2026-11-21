@@ -42,3 +42,11 @@ Start the local app above. Run `node scripts/live-room-smoke.mjs .sahva/syntheti
 Run `node scripts/hands-free-smoke.mjs .sahva/synthetic-inputs-EXAMPLE` against the same running app for the four-phrase test. Each browser receives synthetic audio at its microphone input. The test exercises the real capture worklet, room leases, speech APIs, automatic playback, headphone interruption, mute, reconnection, consent and meeting outcomes. It makes paid provider calls. For a physical rehearsal, use two separate devices, start on headphones, then repeat with the headphone option off using speakerphone. Record whether either device misses the first syllable or transcribes its own speaker output.
 
 For the regional startup regression set `$env:SAHVA_SMOKE_SLOW_LINK='1'` before running the hands-free smoke, then remove that variable. The test adds 2.6 seconds to live/start and 220 milliseconds before each live/frame request. Run once without those delays on the deployment to measure the actual network.
+
+## LiveKit group meetings
+
+Configure the server with `SAHVA_LIVEKIT=1`, the project’s `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`. LiveKit Cloud supplies a secure WebSocket URL. Keep these settings server-side. Use a Linux runtime with the Node RTC native library and FFmpeg. The production image contains both. A shared LiveKit project should use explicit dispatch for other agents. Sahva names its media rooms for the Sahva room UUID and consent epoch. Browser tokens allow microphone publication. Only the interpreter subscribes to microphone tracks.
+
+Run the usual database setup to apply migration 005. Existing rooms use the phrase transport. The group meeting option appears when configured. The server uses one long-running process per app instance, with one in-process interpreter connection per active meeting. Use a single app replica for this version.
+
+For the end-to-end check, point `SAHVA_SMOKE_ORIGIN` to a configured app and run `node scripts/meeting-smoke.mjs <synthetic-wav-folder>` with english.wav and telugu.wav. The driver creates three isolated browser contexts and sends only generated fixture speech. It exercises both listener languages, concurrent speakers, consent withdrawal, reconnection, source replay and report evidence. Test phone pickup, speakerphone echo and perceived latency separately on physical devices.

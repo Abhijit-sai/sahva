@@ -6,8 +6,10 @@ export function Recorder({
   room,
   onUploaded,
   onBusy,
+  voice,
 }: {
   room: string;
+  voice?: string;
   onUploaded: () => void;
   onBusy: (busy: boolean) => void;
 }) {
@@ -143,6 +145,7 @@ export function Recorder({
     const data = new FormData();
     data.append("audio", draft.blob, "turn");
     data.set("idempotencyKey", draft.key);
+    if (voice) data.set("voice", voice);
     try {
       await api("/" + room + "/turns", data);
       if (live.current) {

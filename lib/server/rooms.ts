@@ -9,7 +9,12 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { database, dataDir, local, type Query } from "./db.ts";
-import { consentVersion, type Member, type Room } from "../shared.ts";
+import {
+  consentVersion,
+  meetingConsent,
+  type Member,
+  type Room,
+} from "../shared.ts";
 
 export class Problem extends Error {
   status: number;
@@ -26,7 +31,7 @@ const profile = z.object({
   listeningLanguage: lang,
   speakingLanguage: lang,
   acceptedConsent: z.literal(true),
-  consentVersion: z.literal(consentVersion),
+  consentVersion: z.enum([consentVersion, meetingConsent]),
 });
 const hash = (secret: string) =>
   createHash("sha256").update(secret).digest("hex");
@@ -80,7 +85,7 @@ export async function roomState(
   lock = false,
 ) {
   const [room] = await q<Room>(
-    "select id,title,status,created_at,ended_at,expires_at from sahva.rooms where id=$1 and expires_at>now()" +
+    "select id,title,transport,media_epoch,status,created_at,ended_at,expires_at from sahva.rooms where id=$1 and expires_at>now()" +
       (lock ? " for update" : ""),
     [id],
   );
@@ -97,7 +102,7 @@ export async function roomState(
     me,
     canRecord:
       room.status === "active" &&
-      members.length === 2 &&
+      members.length >= 2 &&
       members.every((m) => m.consented_at !== null),
   };
 }
@@ -105,6 +110,7 @@ export async function enter(input: unknown, existing?: string) {
   const form = profile
     .extend({
       title: z.string().trim().min(1).max(80).default("Conversation"),
+      transport: z.enum(["phrase", "livekit"]).default("phrase"),
       invite: z.string().max(96).optional(),
     })
     .parse(input);
@@ -114,9 +120,11 @@ export async function enter(input: unknown, existing?: string) {
     invite = randomBytes(32).toString("base64url");
   const token = await sign(id, member, Date.now() + 86_400_000);
   await db.transaction(async (q) => {
+    let seat = 1;
+    let transport = form.transport;
     if (existing) {
       const [room] = await q(
-        "select id,status from sahva.rooms where id=$1 and invite_hash=$2 and expires_at>now() for update",
+        "select id,status,transport from sahva.rooms where id=$1 and invite_hash=$2 and expires_at>now() for update",
         [id, hash(form.invite ?? "")],
       );
       if (!room)
@@ -125,17 +133,29 @@ export async function enter(input: unknown, existing?: string) {
           "INVITE",
           "This invitation is invalid or expired.",
         );
-      if (
-        room.status !== "active" ||
-        (
-          await q(
-            "select id from sahva.participants where room_id=$1 and seat=2",
-            [id],
-          )
-        ).length
-      )
+      transport = room.transport as typeof transport;
+      const [row] = await q(
+        "select max(seat) as last from sahva.participants where room_id=$1",
+        [id],
+      );
+      seat = Number(row.last) + 1;
+      if (room.status !== "active" || seat > (transport === "livekit" ? 6 : 2))
         throw new Problem(409, "CLOSED", "This room is full or has ended.");
     } else {
+      if (
+        transport === "livekit" &&
+        !(
+          process.env.SAHVA_LIVEKIT === "1" &&
+          process.env.LIVEKIT_URL &&
+          process.env.LIVEKIT_API_KEY &&
+          process.env.LIVEKIT_API_SECRET
+        )
+      )
+        throw new Problem(
+          503,
+          "MEETING_CONFIG",
+          "LiveKit meetings are unavailable on this server.",
+        );
       await q("lock table sahva.rooms in share row exclusive mode");
       const [{ count }] = await q(
         "select count(*)::int as count from sahva.rooms where expires_at>now()",
@@ -143,16 +163,25 @@ export async function enter(input: unknown, existing?: string) {
       if (Number(count) >= 100)
         throw new Problem(429, "LIMIT", "All demo rooms are in use.");
       await q(
-        "insert into sahva.rooms(id,title,invite_hash) values($1,$2,$3)",
-        [id, form.title, hash(invite)],
+        "insert into sahva.rooms(id,title,invite_hash,transport) values($1,$2,$3,$4)",
+        [id, form.title, hash(invite), transport],
       );
     }
+    if (
+      form.consentVersion !==
+      (transport === "livekit" ? meetingConsent : consentVersion)
+    )
+      throw new Problem(
+        400,
+        "CONSENT_VERSION",
+        "Open the full invitation and review the meeting consent notice.",
+      );
     await q(
       "insert into sahva.participants(id,room_id,seat,name,listening,speaking,consented_at,consent_version) values($1,$2,$3,$4,$5,$6,now(),$7)",
       [
         member,
         id,
-        existing ? 2 : 1,
+        seat,
         form.name,
         form.listeningLanguage,
         form.speakingLanguage,
@@ -160,5 +189,5 @@ export async function enter(input: unknown, existing?: string) {
       ],
     );
   });
-  return { id, token, invite: existing ? undefined : invite };
+  return { id, token, member, invite: existing ? undefined : invite };
 }

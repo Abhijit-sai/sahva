@@ -12,7 +12,7 @@ import {
   appendFrame,
   interpretDraft,
   finishLive,
-  liveCaption,
+  liveCaptions,
   cancelRoomStream,
 } from "../../../../../lib/server/live";
 import { setRecording } from "../../../../../lib/server/recording";
@@ -25,7 +25,7 @@ import {
   processStage,
 } from "../../../../../lib/server/turns";
 import { serverTime } from "../../../../../lib/rehearsal";
-import { consentVersion } from "../../../../../lib/shared";
+import { consentVersion, meetingConsent } from "../../../../../lib/shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,7 +86,11 @@ async function handle(req: NextRequest, context: Params) {
     ) {
       const session = await enter(await jsonInput(req), id);
       const response = json(
-        { roomId: session.id, invite: session.invite },
+        {
+          roomId: session.id,
+          participantId: session.member,
+          invite: session.invite,
+        },
         201,
       );
       response.cookies.set("sahva_" + session.id, session.token, {
@@ -110,11 +114,29 @@ async function handle(req: NextRequest, context: Params) {
         [id, participant],
       );
       const snapshot = await timeline(id, participant);
+      const captions = snapshot.canRecord ? liveCaptions(id) : [];
       return json({
         ...snapshot,
+        captions,
+        meetingIssues:
+          snapshot.room.transport === "livekit"
+            ? (await import("../../../../../lib/server/meeting")).meetingIssues(
+                id,
+              )
+            : {},
         serverTime: serverTime(),
-        caption: snapshot.canRecord ? liveCaption(id) : null,
+        caption: captions[0] ?? null,
       });
+    }
+    if (post && action === "meeting" && parts.length === 2) {
+      const { voice } = z
+        .object({ voice: z.string().max(64).optional() })
+        .parse(await jsonInput(req));
+      return json(
+        await (
+          await import("../../../../../lib/server/meeting")
+        ).joinMeeting(id, participant, voice),
+      );
     }
     if (post && action === "turns" && parts.length === 2) {
       if (Number(req.headers.get("content-length")) > 4_100_000)
@@ -146,12 +168,17 @@ async function handle(req: NextRequest, context: Params) {
         return json(await finishLive(id, participant, await jsonInput(req)));
     }
     if (post && action === "recording" && parts.length === 2) {
-      await setRecording(id, participant, await jsonInput(req));
+      await setRecording(id, participant, await jsonInput(req), "phrase");
       return json({ ok: true });
     }
     if (post && action === "end" && parts.length === 2) {
       await endRoom(id, participant);
       cancelRoomStream(id);
+      if (
+        (await roomState(db.query, id, participant)).room.transport ===
+        "livekit"
+      )
+        (await import("../../../../../lib/server/meeting")).stopMeeting(id);
       return json({ roomStatus: "ended" }, 202);
     }
     if (action === "report") {
@@ -214,20 +241,40 @@ async function handle(req: NextRequest, context: Params) {
       return json(await roomState(db.query, id, participant));
     }
     if (post && action === "consent" && parts.length === 2) {
-      const { accepted } = z
+      const { accepted, consentVersion: version } = z
         .object({
           accepted: z.boolean(),
-          consentVersion: z.literal(consentVersion),
+          consentVersion: z.enum([consentVersion, meetingConsent]),
         })
         .parse(await jsonInput(req));
       return json(
         await db.transaction(async (q) => {
-          await roomState(q, id, participant, true);
+          const state = await roomState(q, id, participant, true);
+          if (
+            version !==
+            (state.room.transport === "livekit"
+              ? meetingConsent
+              : consentVersion)
+          )
+            throw new Problem(
+              400,
+              "CONSENT_VERSION",
+              "Review the current consent notice.",
+            );
           await q(
             "update sahva.participants set consented_at=case when $3 then now() end where room_id=$1 and id=$2",
             [id, participant, accepted],
           );
           if (!accepted) {
+            if (state.room.transport === "livekit") {
+              await q(
+                "update sahva.rooms set media_epoch=media_epoch+1 where id=$1",
+                [id],
+              );
+              (await import("../../../../../lib/server/meeting")).stopMeeting(
+                id,
+              );
+            }
             cancelRoomStream(id);
             await q(
               "update sahva.participants set recording_until=null,recording_key=null where room_id=$1 and recording_key is not null",

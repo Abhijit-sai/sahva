@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { z } from "zod";
+import { voices, supportsVoice } from "../voices.ts";
 
 const language = z.enum(["te-IN", "en-IN"]);
 export type Language = z.infer<typeof language>;
@@ -19,10 +20,6 @@ const translation = receipt.extend({
 const speech = receipt.extend({
   audios: z.tuple([z.base64().max(10_000_000)]),
 });
-const voices = {
-  "en-IN": "simran_en_customer",
-  "te-IN": "pooja_te_conversation",
-};
 
 export class SpeechError extends Error {
   readonly stage: Stage;
@@ -133,7 +130,13 @@ export class SarvamSpeech {
     };
   }
 
-  async synthesize(text: string, target: Language) {
+  async synthesize(
+    text: string,
+    target: Language,
+    speaker: string = voices[target][0].id,
+  ) {
+    if (!supportsVoice(target, speaker))
+      throw new SpeechError("tts", "UNSUPPORTED_VOICE");
     if (!text.trim() || Array.from(text).length > 2500)
       throw new SpeechError("tts", "TEXT_LENGTH");
     const { data, elapsedMs } = await this.#post(
@@ -141,7 +144,7 @@ export class SarvamSpeech {
       "text-to-speech",
       {
         model: "bulbul:v4-flash",
-        speaker: voices[target],
+        speaker,
         ...(target === "te-IN" ? { pace: 1.2, pitch: -0.1 } : {}),
         text,
         language_code: target,
@@ -159,7 +162,7 @@ export class SarvamSpeech {
     }
     return {
       audio,
-      speaker: voices[target],
+      speaker,
       requestId: data.request_id,
       elapsedMs,
     };

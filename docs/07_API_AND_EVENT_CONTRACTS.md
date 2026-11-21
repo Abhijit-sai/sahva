@@ -1,5 +1,9 @@
 # Proposed API, State and Event Contracts
 
+## Speaker choice
+
+Room creation/join can return the authenticated participant ID, already present in the room snapshot. A manual upload or live finish may include a synthetic voice ID. Validate it against the server-derived target on archive. Missing values resolve the pre-existing language voice. Store the chosen persona with the turn before TTS so the listener's browser may perform processing after the speaker disconnects. The synthetic persona has no role in meeting extraction.
+
 ## Implemented live lifecycle and extension boundary
 
 The authenticated room routes use live/start, frame, interpret and finish. Start takes the recording lease. Frame validates ownership, sequence and byte limits. The polled timeline carries provisional/final captions and optional draft translation. Finish binds the original and final text to an idempotent turn. The existing processing stages expose translation, TTS, ready and retryable failure. Media retrieval requires the participant session. Playback start/end are listener events. Offline/page hide, consent withdrawal and explicit mute release capture. Reconnect requires a fresh gesture.
@@ -132,3 +136,7 @@ Authenticated POSTs under the existing room API use the same CSRF header. `live/
 ## Cross-region capture
 
 The live start route acquires the room lease and uses the authorized state returned by that same transaction for speaker and listener languages. The microphone keeps up to six seconds of onset audio locally while opening the lease. Frame uploads normally carry 200 ms and can combine two consecutive frames into a 400 ms message while a request is outstanding. Sequence numbers count HTTP messages. The relay still enforces its 16,000-byte limit and archives the exact PCM sequence. Backpressure beyond the bounded queue prompts the speaker to review the saved phrase. The listener can open Original on that message.
+
+### Group meeting transport
+
+Create with transport=livekit and the group disclosure version. POST /api/v1/rooms/{room}/meeting requires a signed member session, an active meeting and consent from all members. It returns a short-lived room- and identity-scoped LiveKit microphone credential and accepts an optional validated translated voice. The timeline includes a captions array for concurrent speakers, a phrase_id on archived turns and per-viewer target/text/audio selection. The original two-person response retains caption for existing clients.

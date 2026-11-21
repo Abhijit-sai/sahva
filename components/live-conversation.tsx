@@ -1,15 +1,23 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { languages, type Language, type Member } from "../lib/shared";
+import { MeetingMicrophone } from "./meeting-microphone";
+import {
+  otherLanguage,
+  languages,
+  type Language,
+  type Member,
+} from "../lib/shared";
 import type { TurnView } from "./turn-card";
 import type { ClockSample } from "../lib/rehearsal";
 import type { PlaybackObservation } from "./rehearsal";
 import { armHandsFree } from "./hands-free";
+import { storedVoice, rememberVoice, VoicePicker } from "./voice-picker";
 import { Recorder } from "./recorder";
 import { RoomRequestError } from "./client";
 import { openLiveMicrophone, type PhraseInput } from "./live-microphone";
 
 export type Caption = {
+  key: string;
   speaker: string;
   interimAt?: number;
   text: string;
@@ -21,6 +29,7 @@ type Props = {
   room: string;
   me: Member;
   peer: Member;
+  meeting?: boolean;
   caption: Caption | null;
   turns: TurnView[];
   refresh: () => void;
@@ -31,6 +40,7 @@ export function LiveConversation({
   room,
   me,
   peer,
+  meeting = false,
   caption,
   turns,
   refresh,
@@ -44,6 +54,11 @@ export function LiveConversation({
     [error, setError] = useState(""),
     [listening, setListening] = useState(false);
   const [hands, setHands] = useState<"off" | "starting" | "armed">("off");
+  const voiceLanguage = meeting ? otherLanguage(me.speaking) : peer.listening;
+  const [voice, setVoice] = useState(() =>
+    storedVoice(room, me.id, voiceLanguage),
+  );
+  const selectedVoice = useRef(voice);
   const [manualBusy, setManualBusy] = useState(false);
   const [headphones, setHeadphones] = useState(false);
   const allowVoiceInterrupt = useRef(false);
@@ -102,9 +117,19 @@ export function LiveConversation({
   );
   // Play one incoming turn at a time, in timeline order. Defer playback while either microphone is open.
   const nextIncoming = turns.find(
-    (t) => t.speaker_id !== me.id && !heard.has(t.id) && !t.error,
+    (t) =>
+      t.speaker_id !== me.id &&
+      !heard.has(t.id) &&
+      (!t.error || (meeting && t.source === me.listening)),
   );
-  const incomingId = nextIncoming?.stage === "ready" ? nextIncoming.id : null,
+  const incomingId =
+      nextIncoming &&
+      (nextIncoming.stage === "ready" ||
+        (meeting &&
+          nextIncoming.source === me.listening &&
+          nextIncoming.current_text))
+        ? nextIncoming.id
+        : null,
     synthetic = nextIncoming?.voice;
   useLayoutEffect(() => {
     allowVoiceInterrupt.current = headphones;
@@ -127,8 +152,7 @@ export function LiveConversation({
       !listening ||
       archivePlaying ||
       mode !== "idle" ||
-      me.recording ||
-      peer.recording ||
+      (me.recording || (!meeting && peer.recording)) ||
       playSource.current ||
       !player.current
     )
@@ -202,9 +226,11 @@ export function LiveConversation({
     listening,
     mode,
     playTick,
+    meeting,
     archivePlaying,
   ]);
   async function enableSound() {
+    if (meeting) setHeard(new Set(turns.map((t) => t.id)));
     player.current ??= new AudioContext();
     await player.current.resume();
     setListening(true);
@@ -280,6 +306,7 @@ export function LiveConversation({
                 uncertainty: sample.uncertainty,
               }
             : undefined,
+        selectedVoice.current,
       );
       if (!controller.signal.aborted) stop.current = finish;
       await finished;
@@ -361,6 +388,35 @@ export function LiveConversation({
       window.removeEventListener("pagehide", disconnect);
     };
   }, []);
+  if (meeting)
+    return (
+      <div className="live-box">
+        <div className="live-heading">
+          <h3>Meeting audio</h3>
+          <span role="status">
+            {playing
+              ? "Playing voice"
+              : listening
+                ? "Connected"
+                : "Microphone off"}
+          </span>
+        </div>
+        <p className="live-route">
+          You speak {languages[me.speaking]} and hear {languages[me.listening]}.
+        </p>
+        <MeetingMicrophone
+          id={room}
+          voice={voice}
+          suppress={playing || archivePlaying}
+          enableSound={enableSound}
+          disableSound={() => {
+            stopPlayback();
+            setListening(false);
+          }}
+        />
+        {error && <p role="alert">{error}</p>}
+      </div>
+    );
   return (
     <>
       <div className="live-box">
@@ -401,6 +457,15 @@ export function LiveConversation({
         )}
         <details className="audio-options">
           <summary>Audio options</summary>
+          <VoicePicker
+            target={peer.listening}
+            value={voice}
+            onChange={(next) => {
+              setVoice(next);
+              selectedVoice.current = next;
+              rememberVoice(room, me.id, peer.listening, next);
+            }}
+          />
           <button
             className="secondary"
             aria-pressed={listening}
@@ -443,7 +508,12 @@ export function LiveConversation({
               </button>
             ))}
           <div hidden={hands !== "off" || mode !== "idle"}>
-            <Recorder room={room} onUploaded={refresh} onBusy={setManualBusy} />
+            <Recorder
+              room={room}
+              onUploaded={refresh}
+              onBusy={setManualBusy}
+              voice={voice}
+            />
           </div>
         </details>
         {mode === "speaking" && !caption?.text && words && (

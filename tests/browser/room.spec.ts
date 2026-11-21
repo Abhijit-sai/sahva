@@ -17,8 +17,16 @@ test("two consenting seats persist, third seat and unscoped access are refused",
   await second.getByRole("button", { name: "Agree & join" }).click();
   await expect(page.getByText("Test guest", { exact: true })).toBeVisible();
   await expect(second.getByText("Test guest (you)")).toBeVisible();
+  await second.getByText("Audio options", { exact: true }).click();
+  await second
+    .getByLabel("My translated voice in English")
+    .selectOption("dev_en_conversational");
   await second.reload();
   await expect(second.getByText("Test guest (you)")).toBeVisible();
+  await second.getByText("Audio options", { exact: true }).click();
+  await expect(second.getByLabel("My translated voice in English")).toHaveValue(
+    "dev_en_conversational",
+  );
   const id = new URL(invite).pathname.split("/").pop();
   const stranger = await browser.newContext();
   const base = "http://127.0.0.1:3231/api/v1/rooms/" + id;
@@ -65,7 +73,7 @@ test("a recorded browser turn survives STT failure, retry and reload with privat
     page.getByRole("button", { name: /Stop recording · 1s/ }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Stop recording/ }).click();
-  const preview = page.locator("audio").first();
+  const preview = page.locator(".recorder audio").first();
   await expect(preview).toHaveAttribute("src", /^blob:/);
   await page.getByRole("button", { name: "Submit turn" }).click();
   await expect(

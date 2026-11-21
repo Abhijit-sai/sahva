@@ -14,6 +14,7 @@ import { alignClock, type ClockSample } from "../lib/rehearsal";
 import { api } from "./client";
 import {
   consentVersion,
+  meetingConsent,
   languages,
   type Room,
   type Member,
@@ -26,6 +27,8 @@ type Snapshot = {
   canRecord: boolean;
   turns: TurnView[];
   caption: Caption | null;
+  captions: Caption[];
+  meetingIssues: Record<string, string>;
   serverTime: number;
 };
 export function Workspace({ id }: { id: string }) {
@@ -69,15 +72,15 @@ export function Workspace({ id }: { id: string }) {
           for (const turn of snapshot.turns)
             if (turn.stage === "ready" && !ready.has(turn.id))
               ready.set(turn.id, observed);
-          const interim = snapshot.caption?.interimAt;
-          const liveCaption = snapshot.caption;
-          if (interim !== undefined && liveCaption && !caption.has(interim)) {
+          for (const liveCaption of snapshot.captions) {
+            const interim = liveCaption.interimAt;
+            if (interim === undefined || caption.has(interim)) continue;
             const speaker = snapshot.members.find(
               (member) => member.id === liveCaption.speaker,
             );
             if (
               liveCaption.translated ||
-              speaker?.speaking === liveCaption.target
+              speaker?.speaking === snapshot.me.listening
             )
               caption.set(interim, observed);
           }
@@ -90,7 +93,7 @@ export function Workspace({ id }: { id: string }) {
           (t) => t.stage !== "ready" && !t.error && !t.busy,
         );
         if (
-          snapshot.members.length === 2 &&
+          snapshot.members.length >= 2 &&
           snapshot.members.every((m) => m.consented_at) &&
           pending &&
           (snapshot.canRecord || pending.revision > 0) &&
@@ -113,7 +116,15 @@ export function Workspace({ id }: { id: string }) {
         new URLSearchParams(location.hash.slice(1)).get("invite") ?? "",
       );
       const own = sessionStorage.getItem("invite-" + id);
-      if (own) setShare(location.origin + "/room/" + id + "#invite=" + own);
+      if (own)
+        setShare(
+          location.origin +
+            "/room/" +
+            id +
+            (sessionStorage.getItem("meeting-" + id) ? "?meeting=1" : "") +
+            "#invite=" +
+            own,
+        );
       timer = setTimeout(poll, document.hidden ? 2500 : 650);
     }
     void poll();
@@ -122,7 +133,14 @@ export function Workspace({ id }: { id: string }) {
       clearTimeout(timer);
     };
   }, [id, tick]);
-  if (!state && invite) return <Entry id={id} invite={invite} />;
+  if (!state && invite)
+    return (
+      <Entry
+        id={id}
+        invite={invite}
+        meeting={new URLSearchParams(location.search).has("meeting")}
+      />
+    );
   if (!state)
     return (
       <main>
@@ -132,10 +150,18 @@ export function Workspace({ id }: { id: string }) {
       </main>
     );
   const active = state.room.status === "active";
+  const meeting = state.room.transport === "livekit";
+  const drafts = (state.captions ?? []).filter(
+    (c) =>
+      state.canRecord &&
+      c.text &&
+      !state.turns.some((t) => t.phrase_id === c.key),
+  );
   return (
     <main className="call-workspace">
       <p className="eyebrow">
-        Audio call · {active ? "Live" : "Ended"} ·{" "}
+        {meeting ? "Meeting room" : "Audio call"} · {active ? "Live" : "Ended"}{" "}
+        ·{" "}
         {Math.max(
           0,
           Math.floor(
@@ -160,6 +186,7 @@ export function Workspace({ id }: { id: string }) {
                 {m.id === state.me.id ? " (you)" : ""}
               </strong>
               <small>
+                {meeting ? "Listens in " : ""}
                 {languages[m.listening]} ·{" "}
                 {m.consented_at ? "Consented" : "Consent withdrawn"} ·{" "}
                 {m.recording
@@ -170,7 +197,7 @@ export function Workspace({ id }: { id: string }) {
               </small>
             </div>
           ))}
-          {share && state.members.length === 1 && active && (
+          {share && state.members.length < (meeting ? 6 : 2) && active && (
             <label>
               Invite a participant
               <input
@@ -184,10 +211,15 @@ export function Workspace({ id }: { id: string }) {
           {state.canRecord && !connection ? (
             <>
               <LiveConversation
+                key={state.room.media_epoch}
                 room={id}
+                meeting={meeting}
                 me={state.me}
                 peer={state.members.find((m) => m.id !== state.me.id)!}
-                caption={state.caption}
+                caption={
+                  state.captions?.find((c) => c.speaker === state.me.id) ??
+                  state.caption
+                }
                 turns={state.turns}
                 refresh={refresh}
                 clock={clock}
@@ -199,7 +231,9 @@ export function Workspace({ id }: { id: string }) {
               {connection
                 ? "Recording paused while reconnecting."
                 : active
-                  ? "Recording requires two consenting participants."
+                  ? meeting
+                    ? "Meeting audio needs at least two members and everyone’s consent."
+                    : "Recording requires two consenting participants."
                   : "This room has ended."}
             </p>
           )}
@@ -210,7 +244,7 @@ export function Workspace({ id }: { id: string }) {
                 try {
                   await api("/" + id + "/consent", {
                     accepted: !state.me.consented_at,
-                    consentVersion,
+                    consentVersion: meeting ? meetingConsent : consentVersion,
                   });
                   refresh();
                 } catch (e) {
@@ -251,6 +285,9 @@ export function Workspace({ id }: { id: string }) {
             />
           )}
           <h2>Conversation</h2>
+          {state.meetingIssues?.[state.me.id] && (
+            <p role="alert">{state.meetingIssues[state.me.id]}</p>
+          )}
           {!state.turns.length && !state.caption?.text && (
             <p className="empty-chat">
               {active
@@ -260,7 +297,7 @@ export function Workspace({ id }: { id: string }) {
           )}
           {state.turns.map((t) => (
             <TurnCard
-              key={t.id}
+              key={t.phrase_id ?? t.id}
               room={id}
               turn={t}
               name={
@@ -281,41 +318,39 @@ export function Workspace({ id }: { id: string }) {
               onUpdate={refresh}
             />
           ))}
-          {state.canRecord && state.caption?.text && (
+          {drafts.map((caption) => (
             <div
               className={
                 "chat-message live-caption " +
-                (state.caption.speaker === state.me.id ? "own" : "incoming")
+                (caption.speaker === state.me.id ? "own" : "incoming")
               }
+              key={caption.key}
               data-has-speech="true"
               role="status"
             >
               <small>
-                {
-                  state.members.find((m) => m.id === state.caption?.speaker)
-                    ?.name
-                }{" "}
-                · Live caption
+                {state.members.find((m) => m.id === caption.speaker)?.name} ·
+                Live caption
               </small>
-              {state.caption.speaker === state.me.id ||
-              state.caption.target ===
-                state.members.find((m) => m.id === state.caption?.speaker)
+              {caption.speaker === state.me.id ||
+              state.me.listening ===
+                state.members.find((m) => m.id === caption.speaker)
                   ?.speaking ? (
-                <p>{state.caption.text}</p>
+                <p>{caption.text}</p>
               ) : (
                 <>
-                  <p lang={state.caption.target}>
-                    {state.caption.translated || "Translating…"}
+                  <p lang={caption.target}>
+                    {caption.translated || "Translating…"}
                   </p>
-                  {state.caption.translated && <small>Draft translation</small>}
+                  {caption.translated && <small>Draft translation</small>}
                   <details>
                     <summary>Original</summary>
-                    <p>{state.caption.text}</p>
+                    <p>{caption.text}</p>
                   </details>
                 </>
               )}
             </div>
-          )}
+          ))}
         </section>
       </div>
       <Rehearsal

@@ -93,6 +93,17 @@ describe("Sarvam transport contracts (simulated responses)", () => {
       provider.synthesize("fixture", "te-IN"),
     ).rejects.toBeInstanceOf(SpeechError);
   });
+  it("rejects a voice catalog mismatch before contacting the provider", async () => {
+    const send = vi.fn<typeof fetch>();
+    await expect(
+      new SarvamSpeech("test-only", send).synthesize(
+        "hello",
+        "te-IN",
+        "dev_en_conversational",
+      ),
+    ).rejects.toMatchObject({ code: "UNSUPPORTED_VOICE" });
+    expect(send).not.toHaveBeenCalled();
+  });
   it("enforces Mayura's character budget before calling the provider", async () => {
     const send = vi.fn<typeof fetch>();
     await expect(

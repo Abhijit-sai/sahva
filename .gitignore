@@ -12,6 +12,7 @@ next-env.d.ts
 *.webm
 *.ogg
 *.mp3
+!public/voice-previews/*.mp3
 *.m4a
 *.mp4
 .next-e2e/

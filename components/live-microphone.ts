@@ -13,6 +13,7 @@ export async function openLiveMicrophone(
   onError: (message: string) => void,
   input?: PhraseInput,
   capture?: () => CaptureTiming | undefined,
+  voice?: string,
 ) {
   const path = "/" + room + "/live/";
   let key: string | undefined, releaseInput: (() => void) | undefined;
@@ -44,7 +45,7 @@ export async function openLiveMicrophone(
     try {
       await sending;
       if (disposed) return;
-      const body = { key, capture: capture?.() };
+      const body = { key, capture: capture?.(), voice };
       try {
         await api(path + "finish", body);
       } catch (e) {

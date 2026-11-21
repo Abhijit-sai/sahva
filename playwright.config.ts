@@ -21,6 +21,14 @@ export default defineConfig({
       SAHVA_LOCAL: "1",
       SAHVA_TEST_RUN: String(Date.now()),
       SAHVA_OFFLINE_TEST: process.env.SAHVA_LIVE_QA === "1" ? "0" : "1",
+      ...(process.env.SAHVA_LIVE_QA === "1"
+        ? {}
+        : {
+            SAHVA_LIVEKIT: "1",
+            LIVEKIT_URL: "ws://127.0.0.1:1",
+            LIVEKIT_API_KEY: "offline-test",
+            LIVEKIT_API_SECRET: "offline-test-only",
+          }),
       NEXT_TELEMETRY_DISABLED: "1",
     },
     timeout: 90000,

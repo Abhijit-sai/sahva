@@ -1,7 +1,7 @@
 // The QA driver supplies synthetic waveforms only at the microphone boundary.
 // Both browsers run the actual room UI, speech gate, streaming APIs, playback and report.
 import { chromium } from "playwright";
-import { readFile } from "node:fs/promises";
+import { installSyntheticMicrophone } from "./qa-microphone.mjs";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 const fixtures = process.argv[2];
@@ -10,6 +10,7 @@ const origin = process.env.SAHVA_SMOKE_ORIGIN || "http://127.0.0.1:3018";
 const browser = await chromium.launch({
   channel: process.env.PLAYWRIGHT_CHANNEL || "chrome",
 });
+const verifyVoices = process.env.SAHVA_SMOKE_VOICES === "1";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function seat(wav) {
   const page = await browser.newPage();
@@ -23,32 +24,7 @@ async function seat(wav) {
       await route.continue();
     });
   }
-  await page.addInitScript(
-    (base64) => {
-      const tracks = [];
-      let audio, clip, output;
-      navigator.mediaDevices.getUserMedia = async () => {
-        audio ??= new AudioContext();
-        await audio.resume();
-        clip ??= await audio.decodeAudioData(
-          Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer,
-        );
-        output = audio.createMediaStreamDestination();
-        tracks.push(...output.stream.getAudioTracks());
-        return output.stream;
-      };
-      window.qaTracks = () =>
-        tracks.filter((t) => t.readyState === "live").length;
-      window.qaSpeak = async (seconds) => {
-        await audio.resume();
-        const source = audio.createBufferSource();
-        source.buffer = clip;
-        source.connect(output);
-        source.start(0, 0, seconds ?? clip.duration);
-      };
-    },
-    (await readFile(join(fixtures, wav))).toString("base64"),
-  );
+  await installSyntheticMicrophone(page, join(fixtures, wav));
   return page;
 }
 const click = (p, name) => p.getByRole("button", { name, exact: true }).click();
@@ -62,11 +38,23 @@ try {
   await a.getByLabel("Your name").fill("Anu");
   await a.getByLabel("Speak in").selectOption("te-IN");
   await a.getByLabel("Listen in").selectOption("te-IN");
+  if (verifyVoices) {
+    await a.getByText("Choose my translated voice").click();
+    await a
+      .getByLabel("My translated voice in English")
+      .selectOption("dev_en_conversational");
+  }
   await a.getByRole("checkbox").check();
   await click(a, "Agree & create room");
   const invite = await a.getByLabel("Invitation link").inputValue();
   await b.goto(invite);
   await b.getByLabel("Your name").fill("Sam");
+  if (verifyVoices) {
+    await b.getByText("Choose my translated voice").click();
+    await b
+      .getByLabel(/My translated voice in .*Telugu/)
+      .selectOption("kavitha_te_conversation");
+  }
   await b.getByRole("checkbox").check();
   await click(b, "Agree & join");
   const api =
@@ -114,6 +102,16 @@ try {
     const turn = data.turns[i];
     assert.equal(turn.source, i % 2 ? "en-IN" : "te-IN");
     assert.equal(turn.voice, true);
+    if (verifyVoices)
+      assert.equal(
+        turn.output_voice,
+        [
+          "dev_en_conversational",
+          "kavitha_te_conversation",
+          "simran_en_customer",
+          "kavitha_te_conversation",
+        ][i],
+      );
     const message = listener.locator("#turn-" + turn.id);
     assert.equal(
       await message.locator(".message-caption").innerText(),
@@ -144,6 +142,10 @@ try {
     );
     assert.equal((await original.body()).toString("ascii", 0, 4), "RIFF");
     if (i === 0) {
+      if (verifyVoices)
+        await a
+          .getByLabel("My translated voice in English")
+          .selectOption("simran_en_customer");
       // Simulated speaker bleed while the receiver is playing incoming audio.
       await listener.evaluate(() => window.qaSpeak(0.8));
     }

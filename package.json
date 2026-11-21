@@ -17,7 +17,10 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.17",
+    "@livekit/rtc-node": "^1.2.3",
     "@supabase/supabase-js": "^2.119.2",
+    "livekit-client": "^2.25.0",
+    "livekit-server-sdk": "^2.20.1",
     "next": "^16.0.0",
     "pg": "^8.23.1",
     "react": "^19.2.0",

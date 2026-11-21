@@ -10,6 +10,8 @@ import { Problem, roomState } from "./rooms.ts";
 import { audioDuration, extensions } from "./audio.ts";
 import { save, bytesFor, playback } from "./storage.ts";
 
+import { otherLanguage } from "../shared.ts";
+import { supportsVoice } from "../voices.ts";
 import { serverTime, type TurnTiming } from "../rehearsal.ts";
 
 type Turn = {
@@ -29,6 +31,7 @@ type Turn = {
   retries: number;
   lease: string | null;
   lease_until: string | null;
+  timings: { synthesis?: { speaker?: string } };
 };
 async function getTurn(q: Query, room: string, id: string) {
   const [turn] = await q<Turn>(
@@ -97,7 +100,17 @@ export async function upload(
     const id = randomUUID(),
       seq = Number(count) + 1;
     const key = room + "/" + id + "/original." + extensions[mime];
-    const target = state.members.find((m) => m.id !== person)!.listening;
+    const target =
+      state.room.transport === "livekit"
+        ? otherLanguage(final?.source ?? state.me.speaking)
+        : state.members.find((m) => m.id !== person)!.listening;
+    const voice = form.get("voice");
+    if (voice !== null && !supportsVoice(target, voice))
+      throw new Problem(
+        400,
+        "VOICE",
+        "Choose a supported voice for the listener’s language.",
+      );
     await save("room-original-audio", key, bytes, mime);
     await q(
       "insert into sahva.turns(id,room_id,speaker_id,seq,idem,mime,duration_ms,original_key,target,raw_text,source,stage,timings) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)",
@@ -114,7 +127,10 @@ export async function upload(
         final?.text ?? null,
         final?.source ?? null,
         final ? "translation" : "stt",
-        JSON.stringify(timing ? { live: timing } : {}),
+        JSON.stringify({
+          live: timing,
+          synthesis: voice ? { speaker: voice } : undefined,
+        }),
       ],
     );
     return { id, seq };
@@ -124,8 +140,8 @@ export async function timeline(room: string, person: string) {
   const db = await database();
   const state = await roomState(db.query, room, person);
   const turns = await db.query(
-    `select t.id,t.seq,t.speaker_id,t.duration_ms,t.created_at,t.source,t.raw_text,t.target,t.revision,t.stage,t.error,t.retries,
-    t.timings->'live' as live_timing, t.timings->'translation'->'at' as translated_at,
+    `select t.id,t.idem as phrase_id,t.seq,t.speaker_id,t.duration_ms,t.created_at,t.source,t.raw_text,t.target,t.revision,t.stage,t.error,t.retries,
+    t.timings->'tts'->>'speaker' as output_voice, t.timings->'live' as live_timing, t.timings->'translation'->'at' as translated_at,
     t.timings->'tts'->'at' as generated_at, t.timings->'stt'->'at' as transcribed_at,
     coalesce(r.text,t.raw_text) as current_text,d.text as translated_text,(d.audio_key is not null) as voice,
     (t.lease_until>now()) is true as busy from sahva.turns t
@@ -133,6 +149,15 @@ export async function timeline(room: string, person: string) {
     left join sahva.deliveries d on d.turn_id=t.id and d.revision=t.revision where t.room_id=$1 order by seq`,
     [room],
   );
+  if (state.room.transport === "livekit") {
+    for (const t of turns) {
+      if (t.speaker_id !== person && t.source === state.me.listening) {
+        t.target = t.source;
+        t.translated_text = t.current_text;
+        t.voice = false;
+      }
+    }
+  }
   return { ...state, turns };
 }
 export async function media(
@@ -174,7 +199,7 @@ export async function revise(
   await db.transaction(async (q) => {
     const state = await roomState(q, room, person, true);
     requireConsent(
-      state.members.length === 2 && state.members.every((m) => m.consented_at),
+      state.members.length >= 2 && state.members.every((m) => m.consented_at),
     );
     const t = await getTurn(q, room, id);
     if (t.speaker_id !== person)
@@ -214,7 +239,7 @@ export async function processStage(
 ) {
   const db = await database(),
     lease = randomUUID();
-  const t = await db.transaction(async (q) => {
+  const job = await db.transaction(async (q) => {
     const state = await roomState(q, room, person, true);
     const turn = await getTurn(q, room, id);
     requireConsent(
@@ -231,9 +256,10 @@ export async function processStage(
       "update sahva.turns set lease=$2,lease_until=now()+interval '45 seconds',error=null,retries=retries+$3 where id=$1",
       [id, lease, turn.error ? 1 : 0],
     );
-    return turn;
+    return { t: turn, meeting: state.room.transport === "livekit" };
   });
-  if (!t) return;
+  if (!job) return;
+  const { t, meeting } = job;
   try {
     const current = await db.query<{ text: string }>(
       "select text from sahva.revisions where turn_id=$1 and num=$2",
@@ -249,6 +275,7 @@ export async function processStage(
       source = t.source,
       translated: string | null = null,
       audioKey: string | null = null;
+    let target = t.target;
     let receipt: object = {};
     if (t.stage === "translation" && t.target === source)
       translated = sourceText;
@@ -268,6 +295,7 @@ export async function processStage(
         );
         raw = result.text;
         source = result.language;
+        if (meeting) target = otherLanguage(source);
         next = "translation";
         receipt = {
           ms: result.elapsedMs,
@@ -288,7 +316,13 @@ export async function processStage(
           "select text from sahva.deliveries where turn_id=$1 and revision=$2",
           [id, t.revision],
         );
-        const result = await speech.synthesize(delivery.text, t.target);
+        const result = await speech.synthesize(
+          delivery.text,
+          t.target,
+          supportsVoice(t.target, t.timings.synthesis?.speaker)
+            ? t.timings.synthesis?.speaker
+            : undefined,
+        );
         const generatedAt = serverTime();
         audioKey = room + "/" + id + "/" + t.revision + "-" + lease + ".wav";
         await save(
@@ -301,14 +335,23 @@ export async function processStage(
           ms: result.elapsedMs,
           id: result.requestId,
           at: generatedAt,
+          speaker: result.speaker,
         };
       }
     }
     await db.transaction(async (q) => {
       const updated = await q(
         `update sahva.turns set stage=$3,raw_text=$4,source=$5,lease=null,lease_until=null,retries=0,
-        timings=timings || $6::jsonb where id=$1 and lease=$2 returning id`,
-        [id, lease, next, raw, source, JSON.stringify({ [t.stage]: receipt })],
+        target=$7,timings=timings || $6::jsonb where id=$1 and lease=$2 returning id`,
+        [
+          id,
+          lease,
+          next,
+          raw,
+          source,
+          JSON.stringify({ [t.stage]: receipt }),
+          target,
+        ],
       );
       if (!updated.length) return;
       if (translated !== null)

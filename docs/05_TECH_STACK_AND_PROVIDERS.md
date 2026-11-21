@@ -6,7 +6,7 @@ Keep the installed fetch/WebSocket integration. Saaras v4 accepts base64 mono li
 
 At published pay-as-you-go rates, estimate ₹0.49 per ASR minute, ₹2 per 1,000 translated input characters and ₹1 per 1,000 synthesized characters. Count provisional translation calls separately. OpenAI Realtime Translate lists $0.034 per audio minute. Its published targets include English and omit Telugu, while Telugu is a supported input. A direct or hybrid trial can therefore compare Telugu → English only on that provider. The app's existing OpenAI integration generates reports. [Sarvam prices](https://docs.sarvam.ai/api/getting-started/pricing) · [OpenAI model](https://developers.openai.com/api/docs/models/gpt-realtime-translate) · [Translation language coverage](https://developers.openai.com/cookbook/examples/voice_solutions/realtime_translation_guide)
 
-LiveKit supplies WebRTC tracks and subscriptions. There is no LiveKit client or SFU in this checkout. Evaluate it only if independent transport, loss handling or multiple replicas justify the additional service on measured recordings. [LiveKit track model](https://docs.livekit.io/intro/basics/rooms-participants-tracks/tracks/)
+LiveKit supplies WebRTC tracks and subscriptions. The STREAM-01 group mode uses the LiveKit browser and Node RTC SDKs with a separate media service. A server interpreter subscribes to individual microphone tracks and reuses the Saaras, Mayura and Bulbul pipeline. [LiveKit track model](https://docs.livekit.io/intro/basics/rooms-participants-tracks/tracks/)
 
 **Last documentation check:** 2026-11-21. These are recommendations and documented API facts, **not proof credentials or integration work**.
 
