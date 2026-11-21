@@ -26,6 +26,24 @@ sudo ss -lntp
 
 The provided image targets `x86_64` Linux. Budget disk space for two uncompressed images and one compressed download. The app uses loopback port 3000. Use a dedicated free port or a separate instance if that port belongs to an existing application. Confirm that the workshop permits inbound HTTP/HTTPS and outbound GitHub, Supabase, Sarvam and OpenAI access.
 
+### Provisioning a dedicated buildathon instance
+
+When the intended region has no reusable instance, review the new on-demand charges with the account owner. For a single two-participant demo, select Amazon Linux 2023 **x86_64**, **t3.small** (2 vCPU, 2 GiB RAM) and one **20 GiB gp3** root volume encrypted with the default EBS key. Set the name to `sahva-demo`. The image is prebuilt on GitHub. Node.js serves the app and FFmpeg converts short recordings. Sarvam handles Telugu and English speech, OpenAI extracts outcomes and Supabase stores persistent data. Adding a supported language requires app and provider support, with no language package required on the host.
+
+Enable a public IPv4 address. Allow TCP 443 to the demo audience and TCP 80 for certificate validation. Choose **My IP** for SSH. Use a dedicated ED25519 key pair and keep the downloaded private PEM in the operator's private files. Only the public key belongs on the instance. Confirm the target and network rules in the launch summary before clicking **Launch instance**. Wait for the instance status checks and verify the server's SSH host-key fingerprint against its EC2 system log before transferring settings.
+
+The size is a starting point for one room. Verify capacity during the first real conversation and during a release swap when two containers overlap.
+
+```bash
+free -h
+df -h /
+sudo docker stats --no-stream
+sudo docker system df
+sudo journalctl -k -b --grep='Out of memory|Killed process'
+```
+
+Record the results and watch EC2 CPU credit balance during a longer demo. Keep space for the current image, rollback image and incoming archive. Budget separately for running time, IPv4 time, EBS storage, possible T3 surplus credits, outbound traffic and provider calls. Stopping the instance ends instance compute charges. Retained EBS volumes continue to accrue storage charges. A stop/start can release an automatically assigned public IPv4 address, requiring an updated URL and certificate for IP-based HTTPS. [AWS T3 instances](https://aws.amazon.com/ec2/instance-types/t3/) · [AWS instance stop behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html)
+
 ### 2. Install host tools and fetch the repository
 
 On Amazon Linux 2023:

@@ -148,3 +148,23 @@ Verify the published CI release, reach the Supabase database, configure the name
 
 **Reporter:** Codex | **Project/branch/HEAD:** sahva_project_pack / main / 86d9476 | **Upstream:** origin/main | **Ticket:** SB-07 | **Working tree:** workflow and ledger patch only. Exact event cutoff unknown.
 GitHub run 44877066778 passed the complete Linux check job, including clean install, typecheck, lint, tests, Chrome and production build. Its publish job built the image and ran FFmpeg. The first HTTP probe raced container startup and curl exited 56 on TCP reset. Changed the probe to bounded retry for all transient errors and added container startup logs on exhaustion. No release or EC2 success claimed by this attempt. The workshop console reported zero Mumbai instances. Continue release verification and identify or authorize the intended target. Supabase use is restricted to the supplied Sahva settings, per the user's clarification.
+
+---
+## [2026-11-21 12:31 IST] — Phase 5 — Published image and fallback demonstration — PARTIAL
+
+**Reporter:** Codex. **Repository:** sahva_project_pack. **Branch and implementation commit:** main / a6566ca6dd361cdf83136f1760304cf5f1c327cb. **Upstream:** origin/main. **Tickets:** SB-07, SB-08. **Deadline:** exact cutoff unknown. The working tree was clean at inspection. This documentation update changes ops/AWS_DEPLOYMENT.md and this ledger. All media, keys and local settings remain outside Git.
+
+### Objective and implementation evidence
+- GitHub Actions built and published the amd64 image and checksum. The public release API reported a 434,960,738-byte image and a 91-byte checksum file. [Release](https://github.com/Abhijit-sai/sahva/releases/tag/build-a6566ca6dd361cdf83136f1760304cf5f1c327cb)
+- Added fresh-instance selection, SSH restrictions, encryption, post-launch memory and disk checks, billing behavior and IP changes to the existing deployment and rollback instructions. ADR-0003 still applies.
+- Captured the working local build in two Chrome sessions with separate synthetic Telugu and English microphone inputs. The recorder used browser MediaRecorder, real Sarvam processing in both directions and real OpenAI report generation. Played the two originals and two generated translations, switched report languages and followed an evidence link. The capture uses local private persistence. The four playback streams are synchronized into the video with labeled subtitles. Private artifact: .sahva/capture-xiMPd5/Sahva-demo.mp4.
+
+### Test evidence
+| Check | Result | Evidence |
+| --- | --- | --- |
+| [GitHub Actions run 44877467634](https://github.com/Abhijit-sai/sahva/actions/runs/44877467634) | PASS | Both check and publish jobs succeeded. Includes Linux install, lint, types, unit and offline browser tests, production build, container FFmpeg, HTTP liveness and release upload. |
+| Backup capture and playback | PASS | Two UI microphone submissions, four media playbacks, two report languages, citation navigation. ffprobe reported 1440×960 H.264 video, AAC audio and timed captions, about 84 seconds. Full ffmpeg decode exited 0. |
+| EC2, hosted DB migrations and two physical devices | PENDING | Mumbai inventory showed zero instances. EC2 launch prepared pending authorization. Private Storage buckets already verified through the configured API. Hosted PostgreSQL still needs a reachable endpoint. |
+
+### Next phase
+After authorization, install the release on the identified host, verify the project database from EC2, enable HTTPS and inspect memory with a live room and a deployment overlap. Complete two-device microphone QA. Use ops/AWS_DEPLOYMENT.md for patches. Preserve the clips, environment and private capture locally.
