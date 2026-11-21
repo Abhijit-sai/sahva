@@ -142,3 +142,9 @@ Verify the published CI release, reach the Supabase database, configure the name
 - npm run lint, npm test (10 passed), npm run build and the final offline Chrome suite (3 passed in 20.0s) succeeded. Bash syntax check on ops/aws/update.sh passed. Local preview /api/ready returned HTTP 200.
 - GitHub Actions run 44876820264 failed at npm ci on Linux, before any deployment, because npm 11.19.1 required two optional native-runtime lock entries absent from the Windows-generated lockfile. Repaired the lock in an isolated directory using that runner version. Linux-target npm ci --dry-run --ignore-scripts passed, with 420 dependencies planned.
 - Next: publish and monitor the corrected build. EC2 host identity and reachable Supabase connection are still required for hosted release verification. No database migration or public HTTPS deployment claimed. Existing recordings and runtime credentials remain local.
+
+---
+## [2026-11-21 12:20 IST] — Phase 5: Linux CI and image startup — PARTIAL
+
+**Reporter:** Codex | **Project/branch/HEAD:** sahva_project_pack / main / 86d9476 | **Upstream:** origin/main | **Ticket:** SB-07 | **Working tree:** workflow and ledger patch only. Exact event cutoff unknown.
+GitHub run 44877066778 passed the complete Linux check job, including clean install, typecheck, lint, tests, Chrome and production build. Its publish job built the image and ran FFmpeg. The first HTTP probe raced container startup and curl exited 56 on TCP reset. Changed the probe to bounded retry for all transient errors and added container startup logs on exhaustion. No release or EC2 success claimed by this attempt. The workshop console reported zero Mumbai instances. Continue release verification and identify or authorize the intended target. Supabase use is restricted to the supplied Sahva settings, per the user's clarification.
