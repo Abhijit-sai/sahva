@@ -48,7 +48,10 @@ async function main() {
   uri.searchParams.delete("sslmode");
   const db = new pg.Client({
     connectionString: uri.href,
-    ssl: { rejectUnauthorized: true },
+    ssl: {
+      ca: await readFile("supabase/prod-ca-2021.crt", "utf8"),
+      rejectUnauthorized: true,
+    },
     connectionTimeoutMillis: 10000,
   });
   try {

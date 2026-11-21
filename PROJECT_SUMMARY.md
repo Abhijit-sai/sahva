@@ -182,3 +182,20 @@ After authorization, install the release on the identified host, verify the proj
 
 ### Next operator actions
 Obtain the permitted workshop region, assigned instance or approved connection method from Event Details or the organizer. Obtain the project's IPv4 Session pooler DATABASE_URL and verify the password privately, then run the existing setup script and confirm committed tables. Resume with ops/AWS_DEPLOYMENT.md. The public site and two-device acceptance remain outstanding. Preserve all original data and local secrets.
+
+---
+## [2026-11-21 12:47 IST] — Phase 5 — Hosted database and production audio smoke — PARTIAL
+
+**Reporter:** Codex. **Repository/branch/HEAD at start:** sahva_project_pack / main / 1c978fc. **Upstream:** origin/main. **Tickets:** SB-07, SB-08. Clean initial working tree. Exact cutoff unknown.
+
+### Objective and implementation evidence
+Verified the supplied Tokyo session pooler, scoped to the configured Sahva project. Strict TLS initially rejected its CA chain. Added the public Supabase production root to supabase/prod-ca-2021.crt and loaded it with hostname verification in scripts/setup-supabase.ts and lib/server/db.ts. Updated the private local connection string only after a successful authenticated query. No passwords, identities or audio were committed. Updated ops/AWS_DEPLOYMENT.md for certificate verification and region changes.
+
+### Verification
+- Live setup committed all four SQL migrations. A separate connection read back versions 001–004. Verified both existing private buckets and seven tables including the migration ledger.
+- Local lint and typecheck passed, all 10 unit tests passed, production build passed. Production Next.js on loopback returned ready=true against hosted PostgreSQL.
+- Two isolated Chrome sessions recorded synthetic inputs via MediaRecorder using the production build backed by Tokyo Supabase. Two original and two translated audio streams played. Both localized reports and evidence navigation completed, producing a private backup under .sahva/capture-EVNaTB. No user-provided voice recordings were used for the hosted storage check.
+- Seven warm SELECT 1 samples from this workstation to Tokyo had a median of 123 ms. This does not measure EC2 latency. Prior consented clip receipts show Telugu → English stages of 470/852/2043 ms and English → Telugu 284/754/2511 ms for STT/translation/TTS. Those requests originated on this workstation.
+
+### Decisions, blockers and next steps
+The workshop's existing Oregon CodeEditor is separate from this deployment. User chose a dedicated Oregon EC2 host and an Oregon Supabase project for colocation. The Tokyo project is verified and available during cutover. A private ignored Oregon settings template is ready. No EC2 instance or Oregon database has been provisioned in this entry. Continue with Oregon host provisioning, project-specific runtime configuration, CI release verification and physical-device HTTPS acceptance. No change to the speech models or architecture.

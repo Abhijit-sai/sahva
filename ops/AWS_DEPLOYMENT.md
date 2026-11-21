@@ -171,3 +171,11 @@ After the fix is merged and released, run the updater without an argument, check
 ## Retention and operator deletion
 
 Room access expires after 24 hours. Deletion is manual. For an authorized room deletion, verify its UUID and owner request. In Supabase Storage delete that room’s prefix from both private buckets, including older revision audio. Verify both prefixes are empty. Then delete only the matching row from sahva.rooms inside a transaction. Foreign keys cascade to participants, turns, revisions, deliveries and the meeting record. Verify these counts and record only the date and result in private operator notes. This procedure covers Sahva-managed data; external provider retention follows provider terms.
+
+## Database TLS and region selection
+
+The container includes the public Supabase production root in `supabase/prod-ca-2021.crt`. Both the migration client and the application use it to verify the PostgreSQL server and its hostname. For certificate rotation, verify the public certificate against the project’s Database Settings or the [official Supabase CLI production CA](https://github.com/supabase/cli/blob/develop/apps/cli/src/command-internal/supabase-ca-templates/prod-ca-2021.ts), then retest migrations and application readiness before rollout.
+
+For the Oregon workshop deployment, select the specific Supabase region **West US (Oregon), us-west-2** so room queries and original/translated media stay near EC2. Supabase region changes require another project. Keep the previous project available through acceptance. Verify the new project URL, service key, pooler username and host belong together. Apply migrations, verify private buckets and use synthetic test audio for a two-way acceptance run before directing new rooms there. Existing room data and recordings require a separate scoped migration if they must remain accessible on the new deployment. [Supabase region migration](https://supabase.com/kb/troubleshooting/change-project-region-eWJo5Z)
+
+Measure audio submission to playable translation for each direction from the chosen host. Record the three Sarvam stage times separately from database round trips and member playback. Use synthetic QA clips for server-side comparison. OpenAI runs on room end and can be timed independently.

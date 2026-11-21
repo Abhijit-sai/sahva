@@ -51,7 +51,10 @@ async function connect(): Promise<Database> {
   uri.searchParams.delete("sslmode");
   const pool = new Pool({
     connectionString: uri.href,
-    ssl: { rejectUnauthorized: true },
+    ssl: {
+      ca: await readFile(resolve("supabase/prod-ca-2021.crt"), "utf8"),
+      rejectUnauthorized: true,
+    },
     max: 4,
     connectionTimeoutMillis: 5000,
   });
