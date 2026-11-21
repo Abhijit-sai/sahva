@@ -131,3 +131,14 @@ Added lib/providers/meeting, lib/server/reports and recording, components/report
 
 ### Remaining work
 Verify the published CI release, reach the Supabase database, configure the named existing EC2 host and trusted HTTPS, then run a fresh physical two-device acceptance and fallback capture. Inspect ops/AWS_DEPLOYMENT.md and the newest ledger entries before deployment. The intended instance ID/name and public HTTPS name are outstanding. No destructive actions or new billable AWS resources. Preserve the original documentation history.
+
+---
+## [2026-11-21 12:15 IST] — Phase 5: First GitHub release attempt — IN PROGRESS
+
+**Reporter:** Codex | **Project:** sahva_project_pack | **Branch/HEAD:** main / fb6040fad316eb47fd26f3a35ea4efa03f39374e | **Upstream:** origin/main | **Ticket:** SB-07. The initial source commit reached the public repository. The working tree was clean immediately after push. The current patch changes only package-lock.json and this ledger.
+
+### Evidence and decisions
+- Initial release contents: 81 tracked files. Zero configured credential matches in staged blobs or generated browser assets; no private audio, test directories or environment file in the index.
+- npm run lint, npm test (10 passed), npm run build and the final offline Chrome suite (3 passed in 20.0s) succeeded. Bash syntax check on ops/aws/update.sh passed. Local preview /api/ready returned HTTP 200.
+- GitHub Actions run 44876820264 failed at npm ci on Linux, before any deployment, because npm 11.19.1 required two optional native-runtime lock entries absent from the Windows-generated lockfile. Repaired the lock in an isolated directory using that runner version. Linux-target npm ci --dry-run --ignore-scripts passed, with 420 dependencies planned.
+- Next: publish and monitor the corrected build. EC2 host identity and reachable Supabase connection are still required for hosted release verification. No database migration or public HTTPS deployment claimed. Existing recordings and runtime credentials remain local.
