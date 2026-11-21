@@ -1,3 +1,11 @@
+export class RoomRequestError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 export async function api<T>(path: string, data?: unknown): Promise<T> {
   const multipart = data instanceof FormData;
   const response = await fetch("/api/v1/rooms" + path, {
@@ -11,6 +19,9 @@ export async function api<T>(path: string, data?: unknown): Promise<T> {
   });
   const result = await response.json();
   if (!response.ok)
-    throw new Error(result.error?.message ?? "Room request failed.");
+    throw new RoomRequestError(
+      result.error?.code ?? "ROOM_REQUEST",
+      result.error?.message ?? "Room request failed.",
+    );
   return result;
 }

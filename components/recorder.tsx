@@ -5,9 +5,11 @@ import { api } from "./client";
 export function Recorder({
   room,
   onUploaded,
+  onBusy,
 }: {
   room: string;
   onUploaded: () => void;
+  onBusy: (busy: boolean) => void;
 }) {
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -19,6 +21,9 @@ export function Recorder({
   const [mode, setMode] = useState<
     "idle" | "permission" | "recording" | "preview" | "uploading"
   >("idle");
+  useEffect(() => {
+    onBusy(mode !== "idle");
+  }, [mode, onBusy]);
   const [seconds, setSeconds] = useState(0),
     [error, setError] = useState("");
   const [draft, setDraft] = useState<{

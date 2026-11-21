@@ -48,7 +48,7 @@ export class SarvamSpeech {
   async #post<T>(
     stage: Stage,
     path: string,
-    body: FormData | Record<string, string>,
+    body: FormData | Record<string, string | number>,
     schema: z.ZodType<T>,
   ) {
     const headers = new Headers({ "api-subscription-key": this.#key });
@@ -142,6 +142,7 @@ export class SarvamSpeech {
       {
         model: "bulbul:v4-flash",
         speaker: voices[target],
+        ...(target === "te-IN" ? { pace: 1.2, pitch: -0.1 } : {}),
         text,
         language_code: target,
         output_audio_codec: "wav",

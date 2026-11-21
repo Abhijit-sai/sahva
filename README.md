@@ -74,4 +74,6 @@ A Telugu-speaking user and an English-speaking user join one browser room, excha
 
 ## Live interpreter demo
 
-Create a room in two browser profiles. For a reciprocal demo, choose English for both preferences in one profile and Telugu for both in the other. Both participants consent and select **Enable incoming voice**. Tap **Speak live**, speak a phrase and pause. The peer sees changing source captions and draft translation, then hears the finalized voice. Repeat from the other profile. The timeline and end-room report use the saved, attributed originals and final transcripts. See [the live delivery phases](docs/14_LIVE_DEMO_PHASES.md).
+Create a room, then open its invitation in a second browser profile. Choose English for speaking and listening in one profile and Telugu in the other. Once both participants consent, each selects **Start hands-free**. Take turns speaking and pause at the end of each phrase. The listener sees live captions and a draft translation, then hears the translated voice. The microphone automatically listens for the next turn.
+
+With headphones, select **Using headphones · speak to interrupt playback** to start your reply while the translation is playing. **Mute microphone** releases your microphone. For a single phrase, use **Speak live** and enable incoming voice on the listener's side. Select **End room** to review the same meeting outcomes in either language and replay the supporting turns. [Delivery phases](docs/14_LIVE_DEMO_PHASES.md)

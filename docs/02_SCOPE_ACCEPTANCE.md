@@ -65,3 +65,10 @@ Continuous streaming voice, open mic, echo suppression/ducking, barge-in, LiveKi
 - Both original WAVs remain privately playable. The meeting record uses final source turns, and both localized reports link to evidence.
 - The other member cannot finish someone else's live phrase. Consent withdrawal invalidates the stream, and the owner must finish the active microphone phrase before ending the room.
 - Report microphone-button to first visible source and draft captions, plus finish-request to playback start. Include the device and provider conditions. Acoustic latency, overlapping speech and physical-device checks have separate gates in [the delivery plan](14_LIVE_DEMO_PHASES.md).
+
+### Hands-free extension (LIVE-02)
+
+- One activation per consenting participant supports four alternating, attributed phrases with original recordings, captions, drafts and translated playback in both directions.
+- Silence, incoming playback on the default setting and timeline replay do not initiate a new turn. Headphone users can opt in to interrupt incoming voice by speaking. The playback button also supports explicit interruption.
+- Mute releases the local audio tracks. Connection loss stops capture until the participant enables it again. Consent withdrawal stops both microphones. The four saved turns still support both report languages.
+- Qualify physical acoustic echo, simultaneous speech and mobile microphone recovery on a desktop and phone before the public rehearsal.

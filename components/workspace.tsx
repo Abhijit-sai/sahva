@@ -4,7 +4,6 @@ import { useEffect, useReducer, useState } from "react";
 import { LiveConversation, type Caption } from "./live-conversation";
 import { Entry } from "./entry";
 import { Report } from "./report";
-import { Recorder } from "./recorder";
 import { TurnCard, type TurnView } from "./turn-card";
 import { api } from "./client";
 import {
@@ -151,7 +150,6 @@ export function Workspace({ id }: { id: string }) {
                 turns={state.turns}
                 refresh={refresh}
               />
-              <Recorder room={id} onUploaded={refresh} />
             </>
           ) : (
             <p>

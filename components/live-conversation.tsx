@@ -1,8 +1,11 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { languages, type Language, type Member } from "../lib/shared";
 import type { TurnView } from "./turn-card";
-import { openLiveMicrophone } from "./live-microphone";
+import { armHandsFree } from "./hands-free";
+import { Recorder } from "./recorder";
+import { RoomRequestError } from "./client";
+import { openLiveMicrophone, type PhraseInput } from "./live-microphone";
 
 export type Caption = {
   speaker: string;
@@ -33,6 +36,13 @@ export function LiveConversation({
   const [words, setWords] = useState(""),
     [error, setError] = useState(""),
     [listening, setListening] = useState(false);
+  const [hands, setHands] = useState<"off" | "starting" | "armed">("off");
+  const [manualBusy, setManualBusy] = useState(false);
+  const [headphones, setHeadphones] = useState(false);
+  const allowVoiceInterrupt = useRef(false);
+  const monitor = useRef<AbortController | null>(null);
+  const blocked = useRef(false),
+    echoUntil = useRef(0);
   const [playing, setPlaying] = useState(false);
   const active = useRef<AbortController | null>(null),
     stop = useRef<(() => Promise<void>) | null>(null);
@@ -42,7 +52,10 @@ export function LiveConversation({
   const [playTick, advance] = useState(0);
   useEffect(
     () => () => {
+      monitor.current?.abort();
+      monitor.current = null;
       active.current?.abort();
+      active.current = null;
       void player.current?.close().catch(() => {});
     },
     [],
@@ -53,6 +66,22 @@ export function LiveConversation({
   );
   const incomingId = nextIncoming?.stage === "ready" ? nextIncoming.id : null,
     synthetic = nextIncoming?.voice;
+  useLayoutEffect(() => {
+    allowVoiceInterrupt.current = headphones;
+    blocked.current =
+      peer.recording ||
+      me.recording ||
+      (listening && !!incomingId && !playing) ||
+      manualBusy;
+  }, [
+    headphones,
+    peer.recording,
+    me.recording,
+    playing,
+    incomingId,
+    listening,
+    manualBusy,
+  ]);
   useEffect(() => {
     if (
       !listening ||
@@ -82,6 +111,7 @@ export function LiveConversation({
       source.connect(ctx.destination);
       source.onended = () => {
         if (playSource.current === source) {
+          echoUntil.current = performance.now() + 350;
           playSource.current = null;
           setPlaying(false);
           advance((n) => n + 1);
@@ -114,6 +144,18 @@ export function LiveConversation({
     mode,
     playTick,
   ]);
+  async function enableSound() {
+    player.current ??= new AudioContext();
+    await player.current.resume();
+    setHeard(
+      (prev) =>
+        new Set([
+          ...prev,
+          ...turns.filter((t) => t.stage === "ready").map((t) => t.id),
+        ]),
+    );
+    setListening(true);
+  }
   async function toggleSound() {
     if (listening) {
       playSource.current?.stop();
@@ -121,36 +163,44 @@ export function LiveConversation({
       return;
     }
     try {
-      player.current ??= new AudioContext();
-      await player.current.resume();
-      setHeard(
-        (prev) =>
-          new Set([
-            ...prev,
-            ...turns.filter((t) => t.stage === "ready").map((t) => t.id),
-          ]),
-      );
-      setListening(true);
+      await enableSound();
       setError("");
     } catch {
       setError("Allow audio playback in this browser and try again.");
     }
   }
-  async function start() {
+  function muteMicrophone() {
+    const session = monitor.current;
+    if (!session) return;
+    monitor.current = null;
+    session.abort();
+    setHands("off");
+    if (stop.current) {
+      setMode("saving");
+      void stop.current();
+    } else active.current?.abort();
+  }
+  async function start(input?: PhraseInput) {
     if (active.current) return;
+    if (input && allowVoiceInterrupt.current) playSource.current?.stop();
     setWords("");
     setError("");
     setMode("opening");
     const controller = new AbortController();
     active.current = controller;
+    let complete!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
     const reset = () => {
-      if (active.current === controller) {
-        active.current = null;
-        stop.current = null;
-        setMode("idle");
-        refresh();
-      }
+      complete();
+      if (active.current !== controller) return;
+      active.current = null;
+      stop.current = null;
+      setMode("idle");
+      refresh();
     };
+    controller.signal.addEventListener("abort", reset, { once: true });
     try {
       const finish = await openLiveMicrophone(
         room,
@@ -158,97 +208,220 @@ export function LiveConversation({
         () => setMode("speaking"),
         setWords,
         reset,
-        (msg) => {
+        (message) => {
           if (!controller.signal.aborted) {
-            setError(msg);
+            setError(message);
             reset();
           }
         },
+        input,
       );
       if (!controller.signal.aborted) stop.current = finish;
+      await finished;
     } catch (e) {
-      if (!controller.signal.aborted) setError((e as Error).message);
+      if (!controller.signal.aborted) {
+        if (input && e instanceof RoomRequestError && e.code === "MIC_BUSY") {
+          setError(
+            "Your partner started first. Speak again when their phrase finishes.",
+          );
+        } else {
+          setError((e as Error).message);
+          if (input && monitor.current) {
+            monitor.current.abort();
+            monitor.current = null;
+            setHands("off");
+          }
+        }
+      }
       reset();
+    } finally {
+      controller.signal.removeEventListener("abort", reset);
     }
   }
+  async function enableHands() {
+    if (monitor.current || active.current || manualBusy) return;
+    const session = new AbortController();
+    monitor.current = session;
+    setHands("starting");
+    setError("");
+    try {
+      if (!listening) await enableSound();
+      session.signal.throwIfAborted();
+      await armHandsFree(
+        session.signal,
+        () =>
+          blocked.current ||
+          (!!playSource.current && !allowVoiceInterrupt.current) ||
+          performance.now() < echoUntil.current ||
+          Array.from(document.querySelectorAll("audio")).some(
+            (audio) => !audio.paused && !audio.ended,
+          ),
+        start,
+        () => {
+          muteMicrophone();
+          setError(
+            "Microphone disconnected. Reconnect it and start hands-free again.",
+          );
+        },
+      );
+      if (!session.signal.aborted) setHands("armed");
+    } catch (e) {
+      if (!session.signal.aborted)
+        setError(
+          (e as Error).name === "NotAllowedError"
+            ? "Allow microphone access to start hands-free."
+            : (e as Error).message,
+        );
+      if (monitor.current === session) {
+        monitor.current = null;
+        session.abort();
+        setHands("off");
+      }
+    }
+  }
+  useEffect(() => {
+    const disconnect = () => {
+      if (!monitor.current && !active.current) return;
+      monitor.current?.abort();
+      monitor.current = null;
+      active.current?.abort();
+      setHands("off");
+      setMode("idle");
+      setError("Microphone stopped. Start hands-free again when connected.");
+    };
+    window.addEventListener("offline", disconnect);
+    window.addEventListener("pagehide", disconnect);
+    return () => {
+      window.removeEventListener("offline", disconnect);
+      window.removeEventListener("pagehide", disconnect);
+    };
+  }, []);
   const last = turns.at(-1);
   const text = caption?.text || (mode === "speaking" ? words : "");
   return (
-    <div className="live-box">
-      <div className="live-heading">
-        <h3>Live interpreter</h3>
-        <span>
-          {playing
-            ? "Playing voice"
-            : mode === "speaking"
-              ? "Mic on"
-              : peer.recording
-                ? "Listening"
-                : "Ready"}
-        </span>
-      </div>
-      <p className="live-route">
-        You speak {languages[me.speaking]}. {peer.name} listens in{" "}
-        {languages[peer.listening]}.
-      </p>
-      {mode === "speaking" ? (
-        <button
-          onClick={() => {
-            setMode("saving");
-            void stop.current?.();
-          }}
-        >
-          Finish phrase
-        </button>
-      ) : (
-        <button
-          disabled={mode !== "idle" || peer.recording || playing}
-          onClick={() => void start()}
-        >
-          {mode === "opening"
-            ? "Opening microphone…"
-            : mode === "saving"
-              ? "Saving phrase…"
-              : "Speak live"}
-        </button>
-      )}
-      <button
-        className="secondary"
-        aria-pressed={listening}
-        onClick={() => void toggleSound()}
-      >
-        {listening ? "Mute incoming voice" : "Enable incoming voice"}
-      </button>
-      <div className="live-caption" data-has-speech={!!text} role="status">
-        <small>
-          {caption
-            ? (caption.speaker === me.id ? "You" : peer.name) +
-              " · Live caption"
-            : "Live caption"}
-        </small>
-        <p>
-          {text ||
-            (mode === "speaking"
-              ? "Listening…"
-              : "Tap Speak live. Pause after a phrase to send it.")}
+    <>
+      <div className="live-box">
+        <div className="live-heading">
+          <h3>Live interpreter</h3>
+          <span>
+            {playing
+              ? "Playing voice"
+              : mode === "speaking"
+                ? "Mic on"
+                : peer.recording
+                  ? "Partner speaking"
+                  : hands === "armed"
+                    ? "Listening for your voice"
+                    : "Ready"}
+          </span>
+        </div>
+        <p className="live-route">
+          You speak {languages[me.speaking]}. {peer.name} listens in{" "}
+          {languages[peer.listening]}.
         </p>
-      </div>
-      {caption?.translated && (
-        <div className="live-translation" aria-live="polite">
-          <small>{languages[caption.target]} · Draft translation</small>
-          <p>{caption.translated}</p>
-        </div>
-      )}
-      {!caption && last?.translated_text && (
-        <div className="live-translation">
+        {hands === "off" ? (
+          <button
+            disabled={mode !== "idle" || manualBusy}
+            onClick={() => void enableHands()}
+          >
+            Start hands-free
+          </button>
+        ) : (
+          <button onClick={muteMicrophone}>
+            {hands === "starting" ? "Cancel microphone" : "Mute microphone"}
+          </button>
+        )}
+        {playing && hands === "armed" && (
+          <button
+            className="secondary"
+            onClick={() => playSource.current?.stop()}
+          >
+            Interrupt playback
+          </button>
+        )}
+        {hands === "armed" && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={headphones}
+              onChange={(event) => setHeadphones(event.target.checked)}
+            />{" "}
+            Using headphones · speak to interrupt playback
+          </label>
+        )}
+        {hands === "off" &&
+          (mode === "speaking" ? (
+            <button
+              onClick={() => {
+                setMode("saving");
+                void stop.current?.();
+              }}
+            >
+              Finish phrase
+            </button>
+          ) : (
+            <button
+              disabled={
+                mode !== "idle" || peer.recording || playing || manualBusy
+              }
+              onClick={() => void start()}
+            >
+              {mode === "opening"
+                ? "Opening microphone…"
+                : mode === "saving"
+                  ? "Saving phrase…"
+                  : "Speak live"}
+            </button>
+          ))}
+        <button
+          className="secondary"
+          aria-pressed={listening}
+          onClick={() => void toggleSound()}
+        >
+          {listening ? "Mute incoming voice" : "Enable incoming voice"}
+        </button>
+        <div className="live-caption" data-has-speech={!!text} role="status">
           <small>
-            {languages[last.target]} ·{" "}
-            {last.source === last.target ? "Original" : "Translation"}
+            {caption
+              ? (caption.speaker === me.id ? "You" : peer.name) +
+                " · Live caption"
+              : "Live caption"}
           </small>
-          <p>{last.translated_text}</p>
+          <p>
+            {text ||
+              (mode === "speaking"
+                ? "Listening…"
+                : hands === "armed"
+                  ? playing
+                    ? headphones
+                      ? "Speak to interrupt the translation."
+                      : "Listening resumes after playback."
+                    : peer.recording
+                      ? "Your partner has the microphone."
+                      : "Speak naturally. A pause sends your phrase."
+                  : "Start hands-free, or tap Speak live for one phrase.")}
+          </p>
         </div>
-      )}
-      {error && <p role="alert">{error}</p>}
-    </div>
+        {caption?.translated && (
+          <div className="live-translation" aria-live="polite">
+            <small>{languages[caption.target]} · Draft translation</small>
+            <p>{caption.translated}</p>
+          </div>
+        )}
+        {!caption && last?.translated_text && (
+          <div className="live-translation">
+            <small>
+              {languages[last.target]} ·{" "}
+              {last.source === last.target ? "Original" : "Translation"}
+            </small>
+            <p>{last.translated_text}</p>
+          </div>
+        )}
+        {error && <p role="alert">{error}</p>}
+      </div>
+      <div hidden={hands !== "off" || mode !== "idle"}>
+        <Recorder room={room} onUploaded={refresh} onBusy={setManualBusy} />
+      </div>
+    </>
   );
 }

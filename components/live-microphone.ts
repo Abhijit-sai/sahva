@@ -1,4 +1,6 @@
 import { api } from "./client";
+import { listenPcm, type FrameConsumer } from "./pcm-input";
+export type PhraseInput = (receive: FrameConsumer) => () => void;
 
 // One microphone lease covers one phrase. Keep the upload queue bounded even on slow Wi-Fi.
 export async function openLiveMicrophone(
@@ -8,12 +10,10 @@ export async function openLiveMicrophone(
   onText: (text: string) => void,
   onSaved: () => void,
   onError: (message: string) => void,
+  input?: PhraseInput,
 ) {
   const path = "/" + room + "/live/";
-  const ctx = new AudioContext({ sampleRate: 16000 });
-  let stream: MediaStream | undefined,
-    key: string | undefined,
-    node: AudioWorkletNode | undefined;
+  let key: string | undefined, releaseInput: (() => void) | undefined;
   let stopped = false,
     disposed = false,
     seq = 0,
@@ -25,12 +25,7 @@ export async function openLiveMicrophone(
   let timer: ReturnType<typeof setTimeout> | undefined;
   const release = () => {
     clearTimeout(timer);
-    if (node) {
-      node.port.onmessage = null;
-      node.disconnect();
-    }
-    stream?.getTracks().forEach((t) => t.stop());
-    if (ctx.state !== "closed") void ctx.close().catch(() => {});
+    releaseInput?.();
   };
   const cancel = () => {
     disposed = true;
@@ -68,67 +63,59 @@ export async function openLiveMicrophone(
       if (!disposed) onError(msg);
     });
   }
+  function sendFrame(frame: ArrayBuffer) {
+    if (stopped || !key) return;
+    if (queued >= 12) {
+      fail(
+        Error("The microphone connection fell behind. Try a shorter phrase."),
+      );
+      return;
+    }
+    const audio = btoa(String.fromCharCode(...new Uint8Array(frame)));
+    const index = seq++;
+    queued++;
+    tail = tail
+      .then(async () => {
+        if (disposed) return;
+        const reply = await api<{ text: string; done: boolean }>(
+          path + "frame",
+          { key, seq: index, audio },
+        );
+        if (disposed) return;
+        if (reply.text) {
+          onText(reply.text);
+          if (
+            !reply.done &&
+            !translating &&
+            lastText !== reply.text &&
+            Date.now() - lastTranslation >= 1800
+          ) {
+            translating = true;
+            lastText = reply.text;
+            lastTranslation = Date.now();
+            void api(path + "interpret", { key })
+              .catch(() => {})
+              .finally(() => {
+                translating = false;
+              });
+          }
+        }
+        if (reply.done) queueMicrotask(() => void finish());
+      })
+      .catch(fail)
+      .finally(() => {
+        queued--;
+      });
+  }
   try {
-    await ctx.resume();
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-    });
-    signal.throwIfAborted();
-    await ctx.audioWorklet.addModule("/live-pcm.js");
+    if (!input)
+      releaseInput = await listenPcm(signal, sendFrame, () =>
+        fail(Error("Microphone disconnected.")),
+      );
     signal.throwIfAborted();
     key = (await api<{ key: string }>(path + "start", {})).key;
     signal.throwIfAborted();
-    node = new AudioWorkletNode(ctx, "sahva-pcm");
-    ctx.createMediaStreamSource(stream).connect(node);
-    node.connect(ctx.destination);
-    node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-      if (stopped) return;
-      if (queued >= 12) {
-        fail(
-          Error("The microphone connection fell behind. Try a shorter phrase."),
-        );
-        return;
-      }
-      const audio = btoa(String.fromCharCode(...new Uint8Array(e.data)));
-      const index = seq++;
-      queued++;
-      tail = tail
-        .then(async () => {
-          if (disposed) return;
-          const reply = await api<{ text: string; done: boolean }>(
-            path + "frame",
-            { key, seq: index, audio },
-          );
-          if (disposed) return;
-          if (reply.text) {
-            onText(reply.text);
-            if (
-              !reply.done &&
-              !translating &&
-              lastText !== reply.text &&
-              Date.now() - lastTranslation >= 1800
-            ) {
-              translating = true;
-              lastText = reply.text;
-              lastTranslation = Date.now();
-              void api(path + "interpret", { key })
-                .catch(() => {})
-                .finally(() => {
-                  translating = false;
-                });
-            }
-          }
-          if (reply.done) queueMicrotask(() => void finish());
-        })
-        .catch(fail)
-        .finally(() => {
-          queued--;
-        });
-    };
+    if (input) releaseInput = input(sendFrame);
     timer = setTimeout(() => void finish(), 25000);
     onListening();
     return finish;

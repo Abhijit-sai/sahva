@@ -101,3 +101,5 @@ Change status here from `TODO` to `IN_PROGRESS` / `DONE` / `BLOCKED` only with a
 ## Next buildathon demonstration
 
 After the original SB-00–08 foundation, LIVE-01 covers live source captions, draft translation and automatic phrase delivery. LIVE-02 covers hands-free conversation and interruptions. LIVE-03 covers physical-device acceptance and judge rehearsal. See [live delivery phases](14_LIVE_DEMO_PHASES.md).
+
+LIVE-02 passed the four-phrase local provider test. LIVE-03 hardware and hosted HTTPS checks are open. VOICE-01 follows with optional per-speaker voice previews, delivery preferences and fluent-listener evaluation of emotional expression and tone.

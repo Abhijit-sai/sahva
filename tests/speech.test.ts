@@ -55,7 +55,10 @@ describe("Sarvam transport contracts (simulated responses)", () => {
         source_language_code: source,
         target_language_code: target,
       });
-      expect(JSON.parse(String(send.mock.calls[2][1]?.body))).toMatchObject({
+      const request = JSON.parse(String(send.mock.calls[2][1]?.body));
+      expect(request.pace).toBe(target === "te-IN" ? 1.2 : undefined);
+      expect(request.pitch).toBe(target === "te-IN" ? -0.1 : undefined);
+      expect(request).toMatchObject({
         model: "bulbul:v4-flash",
         language_code: target,
         output_audio_codec: "wav",
