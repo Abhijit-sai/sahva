@@ -168,3 +168,17 @@ GitHub run 44877066778 passed the complete Linux check job, including clean inst
 
 ### Next phase
 After authorization, install the release on the identified host, verify the project database from EC2, enable HTTPS and inspect memory with a live room and a deployment overlap. Complete two-device microphone QA. Use ops/AWS_DEPLOYMENT.md for patches. Preserve the clips, environment and private capture locally.
+
+---
+## [2026-11-21 12:34 IST] — Phase 5 — Workshop deployment attempt — BLOCKED
+
+**Reporter:** Codex. **Repository/branch/HEAD:** sahva_project_pack / main / 4521fa3. **Upstream:** origin/main. **Ticket:** SB-07. The working tree was clean after the previous documentation push. This entry changes PROJECT_SUMMARY.md only. Exact event cutoff unknown.
+
+### Implementation and test evidence
+- The user approved the reviewed Mumbai launch and setup. On the EC2 launch form, selecting Create key pair returned an explicit identity-policy deny for ec2:CreateKeyPair on the workshop participant role. The policy is ws-default-policy. This API attempt failed before a key or EC2 instance was created. No application settings were transferred. This does not establish whether RunInstances is allowed.
+- The host and application artifact architectures match. The first live EC2 readiness and physical-device calls are still pending. The earlier GitHub image, local two-browser integration and private fallback recording remain available.
+- Local configuration metadata check confirmed the PostgreSQL direct host belongs to the configured Sahva project. The decoded password has literal surrounding square brackets. It was not printed or modified. The brackets could belong to the password. Database authentication is unverified because the workstation cannot resolve the direct endpoint.
+- No migrations were applied to the remote PostgreSQL database in this attempt. No new architectural decision. No Supabase browser session was used.
+
+### Next operator actions
+Obtain the permitted workshop region, assigned instance or approved connection method from Event Details or the organizer. Obtain the project's IPv4 Session pooler DATABASE_URL and verify the password privately, then run the existing setup script and confirm committed tables. Resume with ops/AWS_DEPLOYMENT.md. The public site and two-device acceptance remain outstanding. Preserve all original data and local secrets.
